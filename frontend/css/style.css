@@ -1,26 +1,78 @@
-/* ==============================
-   NAVBAR
-   ============================== */
+/* =========================================================
+   TOP BLUE NAVBAR (MULTI THERAPY MANAGEMENT SYSTEM)
+   ========================================================= */
 
-.navbar {
-    min-height: 58px;
-    padding: 6px 14px;
+.mt-navbar {
+    min-height: 80px;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #0d6efd 0%, #0867e8 100%);
+    box-shadow: 0 4px 18px rgba(0, 80, 180, 0.20);
+    position: relative;
+    z-index: 1000;
+    width: 100%;
 }
 
-.navbar-logo {
-    width: 42px !important;
-    height: 42px !important;
-    object-fit: contain;
-    display: block;
-    margin-right: 10px;
-    border-radius: 6px;
-}
-
-.navbar-brand {
-    display: flex !important;
+.mt-navbar-inner {
+    max-width: 1300px;
+    margin: 0 auto;
+    display: flex;
     align-items: center;
-    font-size: 23px;
-    line-height: 1;
+    justify-content: flex-start;
+    gap: 20px;
+}
+
+.mt-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    text-decoration: none;
+    color: #ffffff;
+}
+
+.mt-logo {
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: #ffffff;
+    padding: 3px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+    flex-shrink: 0;
+}
+
+.mt-brand-title {
+    font-size: 26px;
+    font-weight: 800;
+    line-height: 1.15;
+    color: #ffffff;
+    letter-spacing: -0.3px;
+}
+
+.mt-brand-subtitle {
+    margin-top: 4px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.92);
+    letter-spacing: 0.4px;
+    font-weight: 400;
+}
+
+@media (max-width: 768px) {
+    .mt-navbar {
+        padding: 10px 16px;
+        min-height: 70px;
+    }
+    .mt-logo {
+        width: 48px;
+        height: 48px;
+    }
+    .mt-brand-title {
+        font-size: 19px;
+        white-space: normal;
+    }
+    .mt-brand-subtitle {
+        font-size: 12px;
+    }
 }
 
 
