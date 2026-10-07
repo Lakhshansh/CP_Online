@@ -29,10 +29,6 @@ document.addEventListener("DOMContentLoaded", () => {
     button.textContent = hidden ? "🙈" : "👁️";
   });
 
-  document.getElementById("forgotLink").addEventListener("click", (event) => {
-    event.preventDefault();
-    showMessage("loginMessage", "Forgot-password API will be connected in the next backend step.", "info");
-  });
 
   document.getElementById("loginForm").addEventListener("submit", async (event) => {
     event.preventDefault();

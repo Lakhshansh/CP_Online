@@ -3818,6 +3818,152 @@ def api_signup():
     }), 200
 
 
+# =========================================================
+# VERCEL FORGOT PASSWORD & RESET APIS
+# =========================================================
+
+@app.route("/api/forgot-password", methods=["POST"])
+def api_forgot_password():
+    data = request.get_json(silent=True) or {}
+    identifier = str(data.get("identifier", "")).strip()
+
+    if not identifier:
+        return jsonify({
+            "success": False,
+            "message": "Please enter your username or registered email."
+        }), 400
+
+    user = query(
+        """
+        SELECT user_id, username, email
+        FROM users
+        WHERE username=%s OR email=%s
+        LIMIT 1
+        """,
+        (identifier, identifier),
+        one=True
+    )
+
+    if not user:
+        return jsonify({
+            "success": False,
+            "message": "No account found matching that username or email."
+        }), 404
+
+    target_email = user.get("email")
+    if not target_email:
+        return jsonify({
+            "success": False,
+            "message": "No registered email address found on this account."
+        }), 400
+
+    reset_otp = f"{random.randint(100000, 999999)}"
+    delivered = send_email_otp(target_email, reset_otp)
+
+    # Store in session
+    session["api_reset"] = {
+        "user_id": user["user_id"],
+        "email": target_email,
+        "otp": reset_otp,
+        "expires_at": time.time() + 600,
+        "verified": False
+    }
+
+    if delivered:
+        return jsonify({
+            "success": True,
+            "message": f"A 6-digit OTP has been sent to {target_email}."
+        }), 200
+    else:
+        return jsonify({
+            "success": True,
+            "message": f"SMTP is restricted by cloud host. Your reset OTP is: {reset_otp}",
+            "demo_otp": reset_otp
+        }), 200
+
+
+@app.route("/api/verify-reset-otp", methods=["POST"])
+def api_verify_reset_otp():
+    data = request.get_json(silent=True) or {}
+    otp = str(data.get("otp", "")).strip()
+
+    reset_state = session.get("api_reset")
+    if not reset_state:
+        return jsonify({
+            "success": False,
+            "message": "Password reset session expired. Please start over."
+        }), 400
+
+    if time.time() > reset_state.get("expires_at", 0):
+        session.pop("api_reset", None)
+        return jsonify({
+            "success": False,
+            "message": "OTP has expired. Please request a new code."
+        }), 400
+
+    if otp != str(reset_state.get("otp")):
+        return jsonify({
+            "success": False,
+            "message": "Invalid OTP code. Please check and try again."
+        }), 400
+
+    reset_state["verified"] = True
+    session["api_reset"] = reset_state
+
+    return jsonify({
+        "success": True,
+        "message": "OTP verified successfully. You may now choose a new password."
+    }), 200
+
+
+@app.route("/api/reset-password", methods=["POST"])
+def api_reset_password():
+    data = request.get_json(silent=True) or {}
+    new_password = str(data.get("password", ""))
+    confirm_password = str(data.get("confirm_password", ""))
+
+    reset_state = session.get("api_reset")
+    if not reset_state or not reset_state.get("verified"):
+        return jsonify({
+            "success": False,
+            "message": "Unauthorized or unverified request. Please verify OTP first."
+        }), 403
+
+    if not new_password or not confirm_password:
+        return jsonify({
+            "success": False,
+            "message": "Please enter both password fields."
+        }), 400
+
+    if new_password != confirm_password:
+        return jsonify({
+            "success": False,
+            "message": "Passwords do not match."
+        }), 400
+
+    if len(new_password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "Password must be at least 6 characters long."
+        }), 400
+
+    user_id = reset_state["user_id"]
+    hashed = generate_password_hash(new_password)
+
+    try:
+        query("UPDATE users SET password=%s WHERE user_id=%s", (hashed, user_id))
+        session.pop("api_reset", None)
+        return jsonify({
+            "success": True,
+            "message": "Password reset successfully! You can now log in."
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "message": f"Failed to update password: {str(e)}"
+        }), 500
+
+
 if __name__ == '__main__':
 
     app.run(
