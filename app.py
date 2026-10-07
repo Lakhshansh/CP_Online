@@ -4178,3 +4178,50 @@ def api_profile():
         })
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to update profile: {str(e)}'}), 500
+
+
+@app.route('/api/upload-profile-photo', methods=['POST', 'OPTIONS'])
+def api_upload_profile_photo():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    photo = request.files.get('profile_photo') or request.files.get('photo')
+    user_id = request.form.get('user_id') or session.get('user_id')
+    username = request.form.get('username') or session.get('user')
+
+    if not photo or not photo.filename:
+        return jsonify({'success': False, 'message': 'No photo file provided.'}), 400
+
+    if not allowed_profile_file(photo.filename):
+        return jsonify({'success': False, 'message': 'Only JPG, JPEG, PNG or WEBP images are allowed.'}), 400
+
+    if not user_id and not username:
+        return jsonify({'success': False, 'message': 'User identification required.'}), 400
+
+    try:
+        user = query(
+            'SELECT user_id, username, profile_photo FROM users WHERE ' +
+            ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
+            (user_id or username,),
+            one=True
+        )
+
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found.'}), 404
+
+        extension = photo.filename.rsplit('.', 1)[1].lower()
+        filename = secure_filename(f"user_{user['user_id']}_{int(time.time())}.{extension}")
+        save_path = os.path.join(PROFILE_UPLOAD_FOLDER, filename)
+        photo.save(save_path)
+
+        query('UPDATE users SET profile_photo=%s WHERE user_id=%s', (filename, user['user_id']))
+
+        return jsonify({
+            'success': True,
+            'message': 'Profile photo uploaded successfully!',
+            'filename': filename,
+            'photo_url': f"/static/profile_photos/{filename}"
+        }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Upload failed: {str(e)}'}), 500
