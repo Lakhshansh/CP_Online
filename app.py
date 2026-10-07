@@ -3594,9 +3594,9 @@ def api_login():
         """
         SELECT *
         FROM users
-        WHERE username=%s
+        WHERE LOWER(username)=LOWER(%s) OR LOWER(email)=LOWER(%s)
         """,
-        (username,),
+        (username, username),
         one=True
     )
 
