@@ -66,6 +66,8 @@ CORS(
 )
 
 
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_SECURE'] = True
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB upload limit
 PROFILE_UPLOAD_FOLDER = os.path.join(
     BASE_DIR, 'static', 'profile_photos'
@@ -3819,8 +3821,14 @@ def api_signup():
 
 
 # =========================================================
-# VERCEL FORGOT PASSWORD & RESET APIS
+# VERCEL FORGOT PASSWORD & RESET APIS (TOKEN & SESSION BACKED)
 # =========================================================
+
+from itsdangerous import URLSafeTimedSerializer
+
+def get_reset_serializer():
+    secret = app.secret_key or os.getenv('SECRET_KEY', 'cp-management-secret-2026')
+    return URLSafeTimedSerializer(secret)
 
 @app.route("/api/forgot-password", methods=["POST"])
 def api_forgot_password():
@@ -3850,17 +3858,18 @@ def api_forgot_password():
             "message": "No account found matching that username or email."
         }), 404
 
-    target_email = user.get("email")
-    if not target_email:
-        return jsonify({
-            "success": False,
-            "message": "No registered email address found on this account."
-        }), 400
+    target_email = user.get("email") or os.getenv("EMAIL_ADDRESS", "admin@hospital.org")
 
     reset_otp = f"{random.randint(100000, 999999)}"
     delivered = send_email_otp(target_email, reset_otp)
 
-    # Store in session
+    s = get_reset_serializer()
+    reset_token = s.dumps({
+        "user_id": user["user_id"],
+        "otp": reset_otp
+    })
+
+    # Store in session as well
     session["api_reset"] = {
         "user_id": user["user_id"],
         "email": target_email,
@@ -3872,13 +3881,15 @@ def api_forgot_password():
     if delivered:
         return jsonify({
             "success": True,
-            "message": f"A 6-digit OTP has been sent to {target_email}."
+            "message": f"A 6-digit OTP has been sent to {target_email}.",
+            "reset_token": reset_token
         }), 200
     else:
         return jsonify({
             "success": True,
             "message": f"SMTP is restricted by cloud host. Your reset OTP is: {reset_otp}",
-            "demo_otp": reset_otp
+            "demo_otp": reset_otp,
+            "reset_token": reset_token
         }), 200
 
 
@@ -3886,33 +3897,51 @@ def api_forgot_password():
 def api_verify_reset_otp():
     data = request.get_json(silent=True) or {}
     otp = str(data.get("otp", "")).strip()
+    reset_token = data.get("reset_token")
 
-    reset_state = session.get("api_reset")
-    if not reset_state:
-        return jsonify({
-            "success": False,
-            "message": "Password reset session expired. Please start over."
-        }), 400
+    user_id = None
+    expected_otp = None
 
-    if time.time() > reset_state.get("expires_at", 0):
-        session.pop("api_reset", None)
-        return jsonify({
-            "success": False,
-            "message": "OTP has expired. Please request a new code."
-        }), 400
+    if reset_token:
+        try:
+            s = get_reset_serializer()
+            payload = s.loads(reset_token, max_age=600)
+            user_id = payload.get("user_id")
+            expected_otp = str(payload.get("otp", ""))
+        except Exception:
+            return jsonify({
+                "success": False,
+                "message": "Recovery session expired. Please start over."
+            }), 400
+    else:
+        reset_state = session.get("api_reset")
+        if not reset_state:
+            return jsonify({
+                "success": False,
+                "message": "Password reset session expired. Please start over."
+            }), 400
+        user_id = reset_state.get("user_id")
+        expected_otp = str(reset_state.get("otp", ""))
 
-    if otp != str(reset_state.get("otp")):
+    if not otp or otp != expected_otp:
         return jsonify({
             "success": False,
             "message": "Invalid OTP code. Please check and try again."
         }), 400
 
-    reset_state["verified"] = True
-    session["api_reset"] = reset_state
+    s = get_reset_serializer()
+    verified_token = s.dumps({
+        "user_id": user_id,
+        "verified": True
+    })
+
+    if "api_reset" in session:
+        session["api_reset"]["verified"] = True
 
     return jsonify({
         "success": True,
-        "message": "OTP verified successfully. You may now choose a new password."
+        "message": "OTP verified successfully. You may now choose a new password.",
+        "verified_token": verified_token
     }), 200
 
 
@@ -3921,13 +3950,29 @@ def api_reset_password():
     data = request.get_json(silent=True) or {}
     new_password = str(data.get("password", ""))
     confirm_password = str(data.get("confirm_password", ""))
+    verified_token = data.get("verified_token")
 
-    reset_state = session.get("api_reset")
-    if not reset_state or not reset_state.get("verified"):
-        return jsonify({
-            "success": False,
-            "message": "Unauthorized or unverified request. Please verify OTP first."
-        }), 403
+    user_id = None
+    if verified_token:
+        try:
+            s = get_reset_serializer()
+            payload = s.loads(verified_token, max_age=600)
+            if not payload.get("verified"):
+                raise ValueError("Not verified")
+            user_id = payload.get("user_id")
+        except Exception:
+            return jsonify({
+                "success": False,
+                "message": "Reset authorization expired or invalid. Please verify OTP again."
+            }), 403
+    else:
+        reset_state = session.get("api_reset")
+        if not reset_state or not reset_state.get("verified"):
+            return jsonify({
+                "success": False,
+                "message": "Unauthorized or unverified request. Please verify OTP first."
+            }), 403
+        user_id = reset_state.get("user_id")
 
     if not new_password or not confirm_password:
         return jsonify({
@@ -3947,9 +3992,7 @@ def api_reset_password():
             "message": "Password must be at least 6 characters long."
         }), 400
 
-    user_id = reset_state["user_id"]
     hashed = generate_password_hash(new_password)
-
     try:
         query("UPDATE users SET password=%s WHERE user_id=%s", (hashed, user_id))
         session.pop("api_reset", None)

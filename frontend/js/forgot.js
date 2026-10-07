@@ -12,6 +12,8 @@ function clearForgotMessage() {
 }
 
 let savedIdentifier = "";
+let savedResetToken = "";
+let savedVerifiedToken = "";
 
 document.addEventListener("DOMContentLoaded", () => {
   const step1Form = document.getElementById("step1Form");
@@ -42,11 +44,15 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       savedIdentifier = identifier;
+      savedResetToken = res.reset_token || "";
       showForgotMessage(res.message || "Recovery code sent!", "info");
 
       if (res.demo_otp) {
         demoOtpBox.hidden = false;
         demoOtpBox.textContent = `Cloud Notice: Your verification code is: ${res.demo_otp}`;
+        // Automatically prefill the OTP input for convenience
+        const otpInput = document.getElementById("otpInput");
+        if (otpInput) otpInput.value = res.demo_otp;
       } else {
         demoOtpBox.hidden = true;
       }
@@ -81,9 +87,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await apiRequest("/api/verify-reset-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ otp, identifier: savedIdentifier })
+        body: JSON.stringify({
+          otp,
+          identifier: savedIdentifier,
+          reset_token: savedResetToken
+        })
       });
 
+      savedVerifiedToken = res.verified_token || "";
       showForgotMessage(res.message || "Code verified!", "success");
       demoOtpBox.hidden = true;
       step2Form.hidden = true;
@@ -111,10 +122,13 @@ document.addEventListener("DOMContentLoaded", () => {
         body: JSON.stringify({ identifier: savedIdentifier })
       });
 
+      savedResetToken = res.reset_token || "";
       showForgotMessage("A new recovery code has been sent.", "info");
       if (res.demo_otp) {
         demoOtpBox.hidden = false;
         demoOtpBox.textContent = `Cloud Notice: Your verification code is: ${res.demo_otp}`;
+        const otpInput = document.getElementById("otpInput");
+        if (otpInput) otpInput.value = res.demo_otp;
       }
     } catch (err) {
       showForgotMessage(err.message || "Failed to resend code.");
@@ -152,7 +166,8 @@ document.addEventListener("DOMContentLoaded", () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           password,
-          confirm_password: confirm
+          confirm_password: confirm,
+          verified_token: savedVerifiedToken
         })
       });
 
