@@ -4019,3 +4019,51 @@ if __name__ == '__main__':
         ),
         debug=True
     )
+
+@app.route('/api/dashboard', methods=['GET', 'POST', 'OPTIONS'])
+def api_dashboard():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    data = request.get_json(silent=True) or {}
+    user_id = request.args.get('user_id') or data.get('user_id')
+    role = request.args.get('role') or data.get('role')
+
+    try:
+        is_admin = (not user_id) or (str(role).lower() == 'admin')
+        stats = {
+            'patients': query('SELECT COUNT(*) c FROM patients', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM patients WHERE user_id=%s', (user_id,), one=True)['c'],
+            'doctors': query('SELECT COUNT(*) c FROM doctors', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM doctors WHERE user_id=%s', (user_id,), one=True)['c'],
+            'therapists': query('SELECT COUNT(*) c FROM therapists', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM therapists WHERE user_id=%s', (user_id,), one=True)['c'],
+            'appointments': query('SELECT COUNT(*) c FROM appointments', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM appointments WHERE user_id=%s', (user_id,), one=True)['c'],
+            'sessions': query('SELECT COUNT(*) c FROM therapy_sessions', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM therapy_sessions WHERE user_id=%s', (user_id,), one=True)['c'],
+            'reports': query('SELECT COUNT(*) c FROM progress_reports', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM progress_reports WHERE user_id=%s', (user_id,), one=True)['c'],
+            'assignments': query('SELECT COUNT(*) c FROM therapist_exercise_assignments', one=True)['c'] if (table_exists('therapist_exercise_assignments') and is_admin) else (query('SELECT COUNT(*) c FROM therapist_exercise_assignments WHERE user_id=%s', (user_id,), one=True)['c'] if table_exists('therapist_exercise_assignments') else 0)
+        }
+
+        recent = query('''
+            SELECT
+                a.appointment_date,
+                a.appointment_time,
+                a.status,
+                p.name AS patient_name,
+                d.name AS doctor_name
+            FROM appointments a
+            LEFT JOIN patients p ON a.patient_id = p.patient_id
+            LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
+            ORDER BY a.appointment_date DESC, a.appointment_time DESC
+            LIMIT 10
+        ''') or []
+
+        for r in recent:
+            if 'appointment_date' in r and r['appointment_date']:
+                r['appointment_date'] = str(r['appointment_date'])
+            if 'appointment_time' in r and r['appointment_time']:
+                r['appointment_time'] = str(r['appointment_time'])
+
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'recent': recent
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
