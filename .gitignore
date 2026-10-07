@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.DS_Store
+Thumbs.db
+
+# User uploaded files
+static/uploads/
+static/profile_photos/
+.env
+__pycache__/
+*.pyc

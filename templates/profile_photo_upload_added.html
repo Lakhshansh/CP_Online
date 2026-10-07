@@ -1,0 +1,499 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .profile-page {
+        padding: 25px;
+    }
+
+    .profile-header {
+        margin-bottom: 25px;
+    }
+
+    .profile-header h2 {
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .profile-header p {
+        color: #6c757d;
+        margin: 0;
+    }
+
+    .profile-card {
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+        overflow: hidden;
+        max-width: 1000px;
+    }
+
+    .profile-top {
+        padding: 30px;
+        display: flex;
+        align-items: center;
+        gap: 25px;
+        background: linear-gradient(135deg, #eef5ff, #ffffff);
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .profile-avatar {
+        width: 105px;
+        height: 105px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 45px;
+        font-weight: 600;
+        box-shadow: 0 6px 18px rgba(13, 110, 253, 0.25);
+    }
+
+    .profile-name h3 {
+        margin: 0 0 6px;
+        font-weight: 700;
+    }
+
+    .profile-name p {
+        margin: 0;
+        color: #6c757d;
+    }
+
+    .role-badge {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        background: #e7f1ff;
+        color: #0d6efd;
+        font-size: 13px;
+        font-weight: 600;
+    }
+
+    .profile-body {
+        padding: 30px;
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin-bottom: 20px;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 18px;
+    }
+
+    .info-box {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        padding: 17px;
+        background: #fafbfc;
+    }
+
+    .info-label {
+        font-size: 13px;
+        color: #6c757d;
+        margin-bottom: 6px;
+    }
+
+    .info-value {
+        font-size: 15px;
+        font-weight: 600;
+        color: #212529;
+        word-break: break-word;
+    }
+
+    .profile-actions {
+        margin-top: 28px;
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .profile-btn {
+        border: none;
+        border-radius: 10px;
+        padding: 11px 18px;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .edit-btn {
+        background: #0d6efd;
+        color: white;
+    }
+
+    .password-btn {
+        background: #212529;
+        color: white;
+    }
+
+    .back-btn {
+        background: #f1f3f5;
+        color: #212529;
+    }
+
+    .profile-btn:hover {
+        opacity: 0.9;
+    }
+
+
+    .profile-photo-wrap {
+        position: relative;
+        width: 120px;
+        min-width: 120px;
+        text-align: center;
+    }
+
+    .profile-photo,
+    .profile-avatar {
+        width: 105px;
+        height: 105px;
+        border-radius: 50%;
+        object-fit: cover;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto;
+    }
+
+    .upload-photo-form {
+        margin-top: 12px;
+    }
+
+    .upload-photo-input {
+        display: none;
+    }
+
+    .upload-photo-btn {
+        display: inline-block;
+        background: #0d6efd;
+        color: #ffffff;
+        border-radius: 9px;
+        padding: 8px 13px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        border: none;
+    }
+
+    .upload-photo-btn:hover {
+        opacity: 0.9;
+        color: #ffffff;
+    }
+
+    .photo-file-name {
+        margin-top: 7px;
+        font-size: 12px;
+        color: #6c757d;
+        max-width: 180px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+    }
+
+    .save-photo-btn {
+        margin-top: 8px;
+        width: 100%;
+        border: none;
+        background: #198754;
+        color: #fff;
+        border-radius: 9px;
+        padding: 8px 10px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .save-photo-btn:hover {
+        opacity: 0.9;
+    }
+
+    @media (max-width: 768px) {
+
+        .profile-page {
+            padding: 15px;
+        }
+
+        .profile-top {
+            flex-direction: column;
+            text-align: center;
+        }
+
+        .info-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .profile-body {
+            padding: 20px;
+        }
+    }
+</style>
+
+
+<div class="profile-page">
+
+    <!-- PAGE HEADER -->
+    <div class="profile-header">
+
+        <h2>👤 My Profile</h2>
+
+        <p>
+            View your Multi Multi Therapy Management System account information
+        </p>
+
+    </div>
+
+
+    <!-- PROFILE CARD -->
+    <div class="profile-card">
+
+        <!-- PROFILE TOP -->
+        <div class="profile-top">
+
+            <div class="profile-photo-wrap">
+
+                {% if user.profile_photo %}
+                    <img
+                        src="{{ url_for('static', filename='profile_photos/' ~ user.profile_photo) }}"
+                        alt="Profile Photo"
+                        class="profile-photo"
+                    >
+                {% else %}
+                    <div class="profile-avatar">
+                        👤
+                    </div>
+                {% endif %}
+
+                <!-- PROFILE PHOTO UPLOAD -->
+                <form
+                    method="POST"
+                    action="{{ url_for('update_profile_photo') }}"
+                    enctype="multipart/form-data"
+                    class="upload-photo-form"
+                >
+
+                    <label for="profile_photo" class="upload-photo-btn">
+                        📸 Upload Photo
+                    </label>
+
+                    <input
+                        type="file"
+                        id="profile_photo"
+                        name="profile_photo"
+                        class="upload-photo-input"
+                        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                        required
+                        onchange="showSelectedPhoto(this)"
+                    >
+
+                    <span id="photoFileName" class="photo-file-name">
+                        JPG, PNG, JPEG or WEBP
+                    </span>
+
+                    <button type="submit" class="save-photo-btn">
+                        ✅ Save Photo
+                    </button>
+
+                </form>
+
+            </div>
+
+            <div class="profile-name">
+
+                <h3>
+                    {{ user.username }}
+                </h3>
+
+                <p>
+                    {{ user.email }}
+                </p>
+
+                <span class="role-badge">
+                    {{ user.role or 'Admin' }}
+                </span>
+
+            </div>
+
+        </div>
+
+
+        <!-- PROFILE BODY -->
+        <div class="profile-body">
+
+            <div class="section-title">
+                📋 Account Information
+            </div>
+
+
+            <div class="info-grid">
+
+                <!-- USERNAME -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        Username
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.username or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- EMAIL -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        📧 Email Address
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.email or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- PHONE -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        📱 Mobile Number
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.phone or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- HOSPITAL -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        🏥 Hospital Name
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.hospital_name or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- DOCTOR -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        👨‍⚕️ Doctor Name
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.doctor_name or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- SPECIALIZATION -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        🩺 Specialization
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.doctor_specialization or 'Not Available' }}
+                    </div>
+
+                </div>
+
+
+                <!-- ROLE -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        🔐 Account Role
+                    </div>
+
+                    <div class="info-value">
+                        {{ user.role or 'Admin' }}
+                    </div>
+
+                </div>
+
+
+                <!-- USER ID -->
+                <div class="info-box">
+
+                    <div class="info-label">
+                        🆔 User ID
+                    </div>
+
+                    <div class="info-value">
+                        #{{ user.user_id }}
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- ACTION BUTTONS -->
+            <div class="profile-actions">
+
+                <a
+                    href="{{ url_for('edit_profile') }}"
+                    class="profile-btn edit-btn"
+                >
+                    ✏️ Edit Profile
+                </a>
+
+                <a
+                    href="{{ url_for('reset_password') }}"
+                    class="profile-btn password-btn"
+                >
+                    🔑 Change Password
+                </a>
+
+                <a
+                    href="{{ url_for('dashboard') }}"
+                    class="profile-btn back-btn"
+                >
+                    ← Dashboard
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+<script>
+function showSelectedPhoto(input) {
+    const fileName = document.getElementById('photoFileName');
+
+    if (input.files && input.files.length > 0) {
+        fileName.textContent = input.files[0].name;
+    } else {
+        fileName.textContent = 'JPG, PNG, JPEG or WEBP';
+    }
+}
+</script>
+
+{% endblock %}

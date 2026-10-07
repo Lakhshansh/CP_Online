@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .otp-wrapper {
+        min-height: 70vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 30px 15px;
+    }
+
+    .otp-card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border-radius: 22px;
+        padding: 32px;
+        box-shadow: 0 15px 45px rgba(15, 23, 42, .12);
+    }
+
+    .otp-icon {
+        width: 68px;
+        height: 68px;
+        margin: 0 auto 15px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 30px;
+        background: #eaf2ff;
+        color: #0d6efd;
+    }
+
+    .otp-card h2 {
+        text-align: center;
+        font-weight: 700;
+        color: #162033;
+        margin-bottom: 8px;
+    }
+
+    .otp-subtitle {
+        text-align: center;
+        color: #6b7280;
+        margin-bottom: 25px;
+        font-size: 15px;
+    }
+
+    .otp-section {
+        border: 1px solid #e5e7eb;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        background: #f8fafc;
+    }
+
+    .otp-section h5 {
+        margin-bottom: 6px;
+        color: #172033;
+        font-weight: 700;
+    }
+
+    .otp-section small {
+        color: #6b7280;
+        display: block;
+        margin-bottom: 12px;
+    }
+
+    .otp-input {
+        width: 100%;
+        text-align: center;
+        letter-spacing: 8px;
+        font-size: 24px;
+        font-weight: 700;
+        border-radius: 12px;
+        padding: 12px;
+        border: 1px solid #d1d5db;
+        background: #fff;
+    }
+
+    .otp-input:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 3px rgba(13, 110, 253, .12);
+        outline: none;
+    }
+
+    .btn-verify {
+        width: 100%;
+        border: none;
+        border-radius: 12px;
+        padding: 13px;
+        font-size: 17px;
+        font-weight: 700;
+        background: #0d6efd;
+        color: white;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .btn-verify:hover {
+        background: #0b5ed7;
+    }
+
+    .btn-resend {
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 12px;
+        padding: 11px;
+        font-weight: 600;
+    }
+
+    .otp-note {
+        text-align: center;
+        color: #6b7280;
+        font-size: 13px;
+        margin-top: 16px;
+    }
+</style>
+
+<div class="otp-wrapper">
+    <div class="otp-card">
+        <div class="otp-icon">📧</div>
+        <h2>Verify Your Email</h2>
+        <p class="otp-subtitle">
+            A 6-digit OTP has been sent to your email address.
+        </p>
+
+        <form method="POST" action="{{ url_for('verify_signup_otp') }}">
+
+            <div class="otp-section">
+                <h5>📧 Email OTP</h5>
+                <small>Code sent to <strong>{{ email or 'your registered email' }}</strong></small>
+                <input
+                    type="text"
+                    name="email_otp"
+                    class="otp-input"
+                    inputmode="numeric"
+                    autocomplete="one-time-code"
+                    maxlength="6"
+                    pattern="[0-9]{6}"
+                    placeholder="000000"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <button type="submit" class="btn-verify">
+                ✅ Verify &amp; Create Account
+            </button>
+        </form>
+
+        <form method="POST" action="{{ url_for('resend_signup_otp') }}">
+            <button type="submit" class="btn btn-outline-primary btn-resend">
+                🔄 Resend OTP
+            </button>
+        </form>
+
+        <p class="otp-note">
+            OTP is valid for 5 minutes. Never share your OTP with anyone.
+        </p>
+    </div>
+</div>
+{% endblock %}

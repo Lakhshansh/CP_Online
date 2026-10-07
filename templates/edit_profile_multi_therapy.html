@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .edit-profile-wrapper {
+        max-width: 900px;
+        margin: 30px auto;
+        padding: 10px 20px 40px;
+    }
+
+    .edit-profile-card {
+        background: #ffffff;
+        border-radius: 22px;
+        box-shadow: 0 10px 35px rgba(0, 0, 0, 0.10);
+        overflow: hidden;
+        border: 1px solid #e8edf5;
+    }
+
+    .edit-profile-header {
+        padding: 28px 32px;
+        background: linear-gradient(135deg, #eef5ff, #f8fbff);
+        border-bottom: 1px solid #e4ebf5;
+    }
+
+    .edit-profile-header h2 {
+        margin: 0;
+        color: #173b70;
+        font-size: 28px;
+        font-weight: 700;
+    }
+
+    .edit-profile-header p {
+        margin: 7px 0 0;
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+    .edit-profile-body {
+        padding: 32px;
+    }
+
+    .form-section-title {
+        color: #173b70;
+        font-size: 17px;
+        font-weight: 700;
+        margin: 0 0 20px;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 22px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .form-group label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 8px;
+    }
+
+    .form-group input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 13px 15px;
+        border: 1px solid #d7deea;
+        border-radius: 11px;
+        font-size: 15px;
+        outline: none;
+        transition: 0.2s;
+        background: #fff;
+    }
+
+    .form-group input:focus {
+        border-color: #3778d4;
+        box-shadow: 0 0 0 3px rgba(55, 120, 212, 0.12);
+    }
+
+    .form-group input[readonly] {
+        background: #f3f5f8;
+        color: #6b7280;
+        cursor: not-allowed;
+    }
+
+    .help-text {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #7b8494;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 30px;
+        padding-top: 25px;
+        border-top: 1px solid #e9edf3;
+    }
+
+    .profile-action-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        text-decoration: none;
+        border: none;
+        border-radius: 10px;
+        padding: 12px 22px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: 0.2s;
+    }
+
+    .save-btn {
+        background: #2563eb;
+        color: white;
+    }
+
+    .save-btn:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+    }
+
+    .cancel-btn {
+        background: #eef1f5;
+        color: #374151;
+    }
+
+    .cancel-btn:hover {
+        background: #e2e6ec;
+    }
+
+    @media (max-width: 700px) {
+        .edit-profile-wrapper {
+            margin: 15px auto;
+            padding: 5px 12px 30px;
+        }
+
+        .edit-profile-header,
+        .edit-profile-body {
+            padding: 22px;
+        }
+
+        .form-grid {
+            grid-template-columns: 1fr;
+            gap: 17px;
+        }
+
+        .form-group.full-width {
+            grid-column: auto;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+
+        .profile-action-btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="edit-profile-wrapper">
+
+    <div class="edit-profile-card">
+
+        <div class="edit-profile-header">
+            <h2>✏️ Edit Profile</h2>
+            <p>Update your Multi Multi Therapy Management System profile information.</p>
+        </div>
+
+        <div class="edit-profile-body">
+
+            <form method="POST">
+
+                <h3 class="form-section-title">🏥 Hospital & Doctor Information</h3>
+
+                <div class="form-grid">
+
+                    <div class="form-group full-width">
+                        <label for="hospital_name">Hospital Name *</label>
+                        <input
+                            type="text"
+                            id="hospital_name"
+                            name="hospital_name"
+                            value="{{ user.hospital_name or '' }}"
+                            placeholder="Enter hospital name"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="doctor_name">Doctor Name *</label>
+                        <input
+                            type="text"
+                            id="doctor_name"
+                            name="doctor_name"
+                            value="{{ user.doctor_name or '' }}"
+                            placeholder="Enter doctor name"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="doctor_specialization">Doctor Specialization *</label>
+                        <input
+                            type="text"
+                            id="doctor_specialization"
+                            name="doctor_specialization"
+                            value="{{ user.doctor_specialization or '' }}"
+                            placeholder="e.g. Neurologist"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phone">Mobile Number *</label>
+                        <input
+                            type="tel"
+                            id="phone"
+                            name="phone"
+                            value="{{ user.phone or '' }}"
+                            placeholder="10-digit mobile number"
+                            maxlength="10"
+                            pattern="[0-9]{10}"
+                            inputmode="numeric"
+                            required
+                        >
+                        <span class="help-text">Enter exactly 10 digits.</span>
+                    </div>
+
+                </div>
+
+                <h3 class="form-section-title" style="margin-top: 30px;">
+                    👤 Account Information
+                </h3>
+
+                <div class="form-grid">
+
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input
+                            type="text"
+                            id="username"
+                            value="{{ user.username or '' }}"
+                            readonly
+                        >
+                        <span class="help-text">Username cannot be changed here.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input
+                            type="email"
+                            id="email"
+                            value="{{ user.email or '' }}"
+                            readonly
+                        >
+                        <span class="help-text">Email cannot be changed here.</span>
+                    </div>
+
+                </div>
+
+                <div class="form-actions">
+
+                    <button
+                        type="submit"
+                        class="profile-action-btn save-btn"
+                    >
+                        💾 Save Changes
+                    </button>
+
+                    <a
+                        href="{{ url_for('profile') }}"
+                        class="profile-action-btn cancel-btn"
+                    >
+                        ✖ Cancel
+                    </a>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

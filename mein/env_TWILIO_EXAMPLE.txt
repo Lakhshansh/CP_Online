@@ -1,0 +1,19 @@
+# ==============================
+# DATABASE
+# ==============================
+DB_HOST=localhost
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=cerebral_palsy_db
+DB_PORT=3306
+
+# ==============================
+# FLASK
+# ==============================
+SECRET_KEY=change-this-to-a-long-random-secret-key
+
+# ==============================
+# GMAIL EMAIL OTP
+# ==============================
+EMAIL_ADDRESS=yourgmail@gmail.com
+EMAIL_PASSWORD=your-16-character-gmail-app-password

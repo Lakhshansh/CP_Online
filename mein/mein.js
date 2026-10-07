@@ -1,0 +1,4 @@
+SECRET_KEY=cp-management-secret-2026
+
+EMAIL_ADDRESS=joshilakhshansh@gmail.com
+EMAIL_PASSWORD=Ymkrwbefnncijwnqs

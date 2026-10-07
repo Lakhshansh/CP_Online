@@ -1,0 +1,289 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="login-card">
+
+    <!-- LOGO -->
+    <div class="logo-box">
+        <img src="{{ url_for('static', filename='images/logo.png') }}"
+             alt="Multi Therapy Management System Logo"
+             class="login-logo">
+    </div>
+
+    <!-- TITLE -->
+    <h2>Create Account</h2>
+
+    <p class="text-muted">
+        Multi Therapy Management System
+    </p>
+
+    <form method="POST" action="{{ url_for('signup') }}" enctype="multipart/form-data">
+
+        <!-- HOSPITAL NAME -->
+        <input
+            class="form-control mb-3"
+            type="text"
+            name="hospital_name"
+            placeholder="Hospital Name"
+            value="{{ form.get('hospital_name', '') }}"
+            required
+        >
+
+        <!-- MOBILE NUMBER -->
+        <input
+            class="form-control mb-3"
+            type="tel"
+            name="phone"
+            placeholder="10 Digit Mobile Number"
+            maxlength="10"
+            pattern="[0-9]{10}"
+            inputmode="numeric"
+            title="Enter exactly 10 digits"
+            value="{{ form.get('phone', '') }}"
+            required
+        >
+
+        <!-- USERNAME -->
+        <input
+            class="form-control mb-3"
+            type="text"
+            name="username"
+            placeholder="Username"
+            value="{{ form.get('username', '') }}"
+            required
+        >
+
+        <!-- EMAIL -->
+        <input
+            class="form-control mb-3"
+            type="email"
+            name="email"
+            placeholder="Email Address"
+            value="{{ form.get('email', '') }}"
+            required
+        >
+
+        <!-- DOCTOR NAME -->
+        <input
+            class="form-control mb-3"
+            type="text"
+            name="doctor_name"
+            placeholder="Doctor Name"
+            value="{{ form.get('doctor_name', '') }}"
+            required
+        >
+
+        <!-- DOCTOR SPECIALIZATION -->
+        <select
+            class="form-control mb-3"
+            name="doctor_specialization"
+            required
+        >
+            <option value="">Doctor Specialization</option>
+
+            <option value="Neurologist" {% if form.get('doctor_specialization') == 'Neurologist' %}selected{% endif %}>Neurologist</option>
+            <option value="Pediatrician" {% if form.get('doctor_specialization') == 'Pediatrician' %}selected{% endif %}>Pediatrician</option>
+            <option value="Orthopedic" {% if form.get('doctor_specialization') == 'Orthopedic' %}selected{% endif %}>Orthopedic</option>
+            <option value="Physiotherapy" {% if form.get('doctor_specialization') == 'Physiotherapy' %}selected{% endif %}>Physiotherapy</option>
+            <option value="Occupational Therapy" {% if form.get('doctor_specialization') == 'Occupational Therapy' %}selected{% endif %}>Occupational Therapy</option>
+            <option value="Speech Therapy" {% if form.get('doctor_specialization') == 'Speech Therapy' %}selected{% endif %}>Speech Therapy</option>
+            <option value="Behaviour Therapy" {% if form.get('doctor_specialization') == 'Behaviour Therapy' %}selected{% endif %}>Behaviour Therapy</option>
+            <option value="Rehabilitation Specialist" {% if form.get('doctor_specialization') == 'Rehabilitation Specialist' %}selected{% endif %}>
+                Rehabilitation Specialist
+            </option>
+            <option value="Other" {% if form.get('doctor_specialization') == 'Other' %}selected{% endif %}>Other</option>
+        </select>
+
+        <!-- UPLOAD DOCTOR DOCUMENT (MANDATORY) -->
+        <div class="mb-3 text-start">
+            <label for="document_file" class="form-label fw-bold">
+                📄 Upload Doctor Document / Certificate <span class="text-danger">*</span>
+            </label>
+            <input
+                id="document_file"
+                class="form-control"
+                type="file"
+                name="document_file"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                required
+            >
+            <small class="text-muted">
+                Medical license or degree certificate (PDF, DOC, DOCX, JPG, JPEG or PNG • Max 5 MB) <span class="text-danger">*Required</span>
+            </small>
+        </div>
+
+        <!-- PASSWORD -->
+        <div class="password-wrapper mb-3">
+            <input
+                id="signupPassword"
+                class="form-control"
+                type="password"
+                name="password"
+                placeholder="Password (min 6 characters)"
+                minlength="6"
+                required
+            >
+            <button
+                type="button"
+                class="password-toggle"
+                onclick="togglePwd('signupPassword', this)"
+                aria-label="Show password"
+                title="Show password"
+            >👁️</button>
+        </div>
+
+        <!-- CONFIRM PASSWORD -->
+        <div class="password-wrapper mb-3">
+            <input
+                id="signupConfirm"
+                class="form-control"
+                type="password"
+                name="confirm_password"
+                placeholder="Confirm Password"
+                minlength="6"
+                required
+            >
+            <button
+                type="button"
+                class="password-toggle"
+                onclick="togglePwd('signupConfirm', this)"
+                aria-label="Show confirm password"
+                title="Show confirm password"
+            >👁️</button>
+        </div>
+
+        <!-- CAPTCHA -->
+        <div class="captcha-section mb-3">
+            <label class="form-label fw-bold">🔐 Security Verification</label>
+
+            <div class="captcha-row">
+                <img
+                    id="captchaImage"
+                    src="{{ url_for('captcha_image') }}?t={{ range(1, 999999) | random }}"
+                    alt="CAPTCHA"
+                    class="captcha-image"
+                >
+
+                <button
+                    type="button"
+                    class="captcha-refresh"
+                    onclick="refreshCaptcha()"
+                    title="Refresh CAPTCHA"
+                    aria-label="Refresh CAPTCHA"
+                >↻</button>
+            </div>
+
+            <input
+                id="captchaInput"
+                class="form-control mt-2"
+                type="text"
+                name="captcha"
+                placeholder="Enter CAPTCHA code"
+                maxlength="5"
+                autocomplete="off"
+                required
+            >
+        </div>
+
+        <style>
+            .password-wrapper {
+                position: relative;
+                width: 100%;
+            }
+
+            .password-wrapper .form-control {
+                padding-right: 52px;
+            }
+
+            .password-toggle {
+                position: absolute;
+                right: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                border: none;
+                background: transparent;
+                font-size: 20px;
+                cursor: pointer;
+                padding: 6px;
+                z-index: 5;
+            }
+
+            .password-toggle:hover {
+                transform: translateY(-50%) scale(1.08);
+            }
+
+            .captcha-section {
+                text-align: left;
+            }
+
+            .captcha-row {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            .captcha-image {
+                width: 190px;
+                height: 65px;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                object-fit: cover;
+                background: #fff;
+            }
+
+            .captcha-refresh {
+                width: 44px;
+                height: 44px;
+                border: none;
+                border-radius: 10px;
+                background: #0d6efd;
+                color: white;
+                font-size: 24px;
+                cursor: pointer;
+                transition: .2s;
+            }
+
+            .captcha-refresh:hover {
+                transform: rotate(90deg) scale(1.05);
+            }
+        </style>
+
+        <script>
+            function refreshCaptcha() {
+                const img = document.getElementById('captchaImage');
+                const input = document.getElementById('captchaInput');
+                img.src = "{{ url_for('captcha_image') }}?t=" + Date.now();
+                input.value = '';
+                input.focus();
+            }
+
+            function togglePwd(inputId, btn) {
+                const input = document.getElementById(inputId);
+                const isHidden = input.type === 'password';
+                input.type = isHidden ? 'text' : 'password';
+                btn.textContent = isHidden ? '🙈' : '👁️';
+            }
+        </script>
+
+        <!-- CREATE ACCOUNT -->
+        <button
+            type="submit"
+            class="btn btn-success w-100"
+        >
+            Create Account
+        </button>
+
+    </form>
+
+    <!-- BACK TO LOGIN -->
+    <a
+        href="{{ url_for('login') }}"
+        class="btn btn-outline-primary w-100 mt-2"
+    >
+        ← Back to Login
+    </a>
+
+</div>
+
+{% endblock %}

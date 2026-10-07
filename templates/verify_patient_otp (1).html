@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .otp-card {
+        max-width: 520px;
+        margin: 70px auto;
+        background: #fff;
+        padding: 30px;
+        border-radius: 14px;
+        box-shadow: 0 3px 18px rgba(0,0,0,.10);
+        text-align: center;
+    }
+
+    .otp-card h2 {
+        color: #17365d;
+        margin-bottom: 10px;
+    }
+
+    .otp-card p {
+        color: #64748b;
+        line-height: 1.5;
+    }
+
+    .otp-email {
+        font-weight: 700;
+        color: #1769e8;
+        word-break: break-word;
+    }
+
+    .otp-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 13px;
+        font-size: 24px;
+        letter-spacing: 8px;
+        text-align: center;
+        border: 1px solid #ccd5e2;
+        border-radius: 8px;
+        margin: 18px 0;
+    }
+
+    .otp-button {
+        width: 100%;
+        border: 0;
+        border-radius: 8px;
+        padding: 12px;
+        background: #1769e8;
+        color: white;
+        font-size: 16px;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
+    .resend {
+        display: inline-block;
+        margin-top: 16px;
+        color: #1769e8;
+        text-decoration: none;
+        font-weight: 600;
+    }
+</style>
+
+<div class="otp-card">
+    <h2>📧 Verify Patient Email</h2>
+    <p>
+        Enter the 6-digit OTP sent to:
+        <br>
+        <span class="otp-email">{{ email }}</span>
+    </p>
+
+    <form method="POST" action="{{ url_for('verify_patient_otp') }}">
+        <input class="otp-input"
+               type="text"
+               name="email_otp"
+               maxlength="6"
+               minlength="6"
+               pattern="[0-9]{6}"
+               inputmode="numeric"
+               autocomplete="one-time-code"
+               placeholder="000000"
+               required>
+        <button class="otp-button" type="submit">
+            ✓ Verify Email &amp; Add Patient
+        </button>
+    </form>
+
+    <a class="resend" href="{{ url_for('resend_patient_otp') }}">
+        Resend OTP
+    </a>
+</div>
+{% endblock %}

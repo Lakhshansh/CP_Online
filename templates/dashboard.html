@@ -1,0 +1,116 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- Welcome User -->
+<div class="mb-4">
+    <h2 class="fw-bold">
+        Welcome, {{ session.get('user', 'User') }}! 👋
+    </h2>
+
+    <p class="text-muted mb-0">
+        Welcome to Multi Therapy Management System
+    </p>
+</div>
+
+
+<!-- Statistics Cards -->
+<div class="row g-3 mb-4">
+
+    {% for key,label,icon in [
+        ('patients','Patients','👤'),
+        ('doctors','Doctors','👨‍⚕️'),
+        ('therapists','Therapists','🧑‍⚕️'),
+        ('appointments','Appointments','📅'),
+        ('sessions','Therapy Sessions','💪'),
+        ('assignments','Exercise Assignments','🎯'),
+        ('reports','Progress Reports','📊')
+    ] %}
+
+    <div class="col-md-4">
+
+        <div class="card stat p-3 h-100">
+
+            <div class="fs-2">
+                {{ icon }}
+            </div>
+
+            <div class="text-muted">
+                {{ label }}
+            </div>
+
+            <div class="display-6 fw-bold">
+                {{ stats[key] }}
+            </div>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>
+
+
+<!-- Recent Appointments -->
+<div class="card p-3">
+
+    <h5 class="mb-3">
+        📅 Recent Appointments
+    </h5>
+
+    <div class="table-responsive">
+
+        <table class="table">
+
+            <tr>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Patient</th>
+                <th>Doctor</th>
+                <th>Status</th>
+            </tr>
+
+            {% for r in recent %}
+
+            <tr>
+
+                <td>
+                    {{ r.appointment_date }}
+                </td>
+
+                <td>
+                    {{ r.appointment_time }}
+                </td>
+
+                <td>
+                    {{ r.patient_name }}
+                </td>
+
+                <td>
+                    {{ r.doctor_name }}
+                </td>
+
+                <td>
+                    {{ r.status }}
+                </td>
+
+            </tr>
+
+            {% else %}
+
+            <tr>
+                <td colspan="5" class="text-center text-muted">
+                    No appointments
+                </td>
+            </tr>
+
+            {% endfor %}
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

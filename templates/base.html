@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {{ title or 'Multi Therapy Management System' }}
+    </title>
+
+    <!-- Bootstrap -->
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet">
+
+    <!-- Custom CSS -->
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}">
+
+</head>
+
+<body>
+
+<!-- =====================================================
+     MODERN NAVBAR
+     ===================================================== -->
+
+<style>
+    .mt-navbar {
+        min-height: 88px;
+        padding: 12px 24px;
+        background: linear-gradient(135deg,  #0867e8 100%);
+        box-shadow: 0 5px 18px rgba(0, 80, 180, .20);
+        position: relative;
+        z-index: 1000;
+    }
+
+    .mt-navbar-inner {
+        min-height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+    }
+
+    .mt-brand {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        text-decoration: none;
+        color: #fff;
+        min-width: 0;
+    }
+
+    .mt-logo {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #fff;
+        padding: 3px;
+        border: 2px solid rgba(255,255,255,.85);
+        box-shadow: 0 4px 12px rgba(0,0,0,.18);
+        flex-shrink: 0;
+    }
+
+    .mt-brand-title {
+        font-size: 27px;
+        font-weight: 800;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+
+    .mt-brand-subtitle {
+        margin-top: 5px;
+        font-size: 14px;
+        opacity: .92;
+        letter-spacing: .4px;
+    }
+
+    .mt-nav-right {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-shrink: 0;
+    }
+
+    .mt-profile-btn,
+    .mt-logout-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border-radius: 10px;
+        padding: 11px 17px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: .2s ease;
+    }
+
+    .mt-profile-btn {
+        background: #fff;
+        color: #171717;
+    }
+
+    .mt-logout-btn {
+        background: #fff;
+        color: #dc3545;
+    }
+
+    .mt-profile-btn:hover,
+    .mt-logout-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 5px 14px rgba(0,0,0,.12);
+    }
+
+    .mt-user {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        color: #fff;
+        padding-left: 14px;
+        border-left: 1px solid rgba(255,255,255,.35);
+    }
+
+    .mt-user-photo,
+    .mt-user-default {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 3px solid #fff;
+        flex-shrink: 0;
+    }
+
+    .mt-user-photo {
+        object-fit: cover;
+        background: #fff;
+    }
+
+    .mt-user-default {
+        background: #fff;
+        color: #5935a8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+    }
+
+    .mt-user-name {
+        font-size: 17px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .mt-user-role {
+        font-size: 12px;
+        opacity: .9;
+        margin-top: 2px;
+    }
+
+    .mt-arrow {
+        font-size: 20px;
+        margin-left: 3px;
+    }
+
+    @media (max-width: 1000px) {
+        .mt-brand-title { font-size: 21px; }
+        .mt-brand-subtitle { font-size: 12px; }
+        .mt-user-text { display: none; }
+        .mt-navbar { padding: 10px 15px; }
+    }
+
+    @media (max-width: 700px) {
+        .mt-navbar-inner { flex-wrap: wrap; }
+        .mt-brand { width: 100%; }
+        .mt-nav-right {
+            width: 100%;
+            justify-content: flex-end;
+        }
+        .mt-logo { width: 50px; height: 50px; }
+        .mt-brand-title { font-size: 18px; }
+        .mt-brand-subtitle { font-size: 10px; }
+        .mt-profile-btn,
+        .mt-logout-btn { padding: 9px 12px; font-size: 13px; }
+        .mt-user { padding-left: 8px; }
+        .mt-user-photo,
+        .mt-user-default { width: 42px; height: 42px; }
+    }
+</style>
+
+<nav class="mt-navbar">
+    <div class="container-fluid mt-navbar-inner">
+
+        <a class="mt-brand" href="{{ url_for('dashboard') }}">
+            <img
+                src="{{ url_for('static', filename='images/logo.png') }}"
+                alt="Multi Therapy Management System"
+                class="mt-logo"
+            >
+
+            <div>
+                <div class="mt-brand-title">
+                    Multi Therapy Management System
+                </div>
+                <div class="mt-brand-subtitle">
+                    Care • Support • Progress • Together
+                </div>
+            </div>
+        </a>
+
+        {% if session.get('user') %}
+        <div class="mt-nav-right">
+
+            <a class="mt-profile-btn" href="{{ url_for('profile') }}">
+                👤 Profile
+            </a>
+
+            <div class="mt-user">
+                {% if user is defined and user.profile_photo %}
+                    <img
+                        src="{{ url_for('static', filename='profile_photos/' ~ user.profile_photo) }}"
+                        class="mt-user-photo"
+                        alt="Profile"
+                    >
+                {% else %}
+                    <div class="mt-user-default">👤</div>
+                {% endif %}
+
+                <div class="mt-user-text">
+                    <div class="mt-user-name">
+                        {{ session.user }}
+                    </div>
+                    <div class="mt-user-role">
+                        {{ session.role or 'Admin' }}
+                    </div>
+                </div>
+
+                <span class="mt-arrow">⌄</span>
+            </div>
+
+            <a class="mt-logout-btn" href="{{ url_for('logout') }}">
+                🚪 Logout
+            </a>
+
+        </div>
+        {% endif %}
+
+    </div>
+</nav>
+
+<!-- =====================================================
+     MAIN LAYOUT
+     ===================================================== -->
+
+{% if session.get('user') %}
+
+<div class="container-fluid">
+
+    <div class="row">
+
+        <!-- ================= SIDEBAR ================= -->
+
+        <aside class="col-md-2 sidebar p-3">
+
+            <a href="{{ url_for('dashboard') }}">
+                🏠 Dashboard
+            </a>
+
+            <a href="{{ url_for('profile') }}">
+                👤 My Profile
+            </a>
+
+            <a href="{{ url_for('list_module', module='patients') }}">
+                👤 Patients
+            </a>
+
+            <a href="{{ url_for('list_module', module='doctors') }}">
+                👨‍⚕️ Doctors
+            </a>
+
+            <a href="{{ url_for('list_module', module='therapists') }}">
+                🧑‍⚕️ Therapists
+            </a>
+
+            <a href="{{ url_for('appointments') }}">
+                📅 Appointments
+            </a>
+
+            <a href="{{ url_for('sessions') }}">
+                💪 Therapy Sessions
+            </a>
+
+            <a href="{{ url_for('exercise_assignments') }}">
+                🎯 Exercise Assignments
+            </a>
+
+            <a href="{{ url_for('list_module', module='exercises') }}">
+                🏃 Exercises
+            </a>
+
+            <a href="{{ url_for('list_module', module='caregivers') }}">
+                👪 Caregivers
+            </a>
+
+            <a href="{{ url_for('list_module', module='progress_reports') }}">
+                📊 Progress Reports
+            </a>
+
+        </aside>
+
+
+        <!-- ================= CONTENT ================= -->
+
+        <main class="col-md-10 p-4">
+
+{% else %}
+
+        <!-- LOGIN / SIGNUP CONTENT -->
+
+        <main class="container-fluid">
+
+{% endif %}
+
+
+<!-- =====================================================
+     FLASH MESSAGES
+     ===================================================== -->
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+
+    {% if messages %}
+
+        {% for cat, msg in messages %}
+
+            <div class="alert alert-{{ cat }} alert-dismissible fade show"
+                 role="alert">
+
+                {{ msg }}
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert">
+                </button>
+
+            </div>
+
+        {% endfor %}
+
+    {% endif %}
+
+{% endwith %}
+
+
+<!-- =====================================================
+     PAGE CONTENT
+     ===================================================== -->
+
+{% block content %}
+
+{% endblock %}
+
+
+        </main>
+
+    </div>
+
+</div>
+
+
+<!-- Bootstrap JavaScript -->
+
+<script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js">
+</script>
+
+</body>
+
+</html>

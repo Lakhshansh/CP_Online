@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS therapist_exercise_assignments (
+    assignment_id INT AUTO_INCREMENT PRIMARY KEY,
+    patient_id INT NOT NULL,
+    therapist_id INT NOT NULL,
+    exercise_id INT NOT NULL,
+    difficulty ENUM('Easy','Medium','Hard') NOT NULL DEFAULT 'Medium',
+    target_type ENUM('repetitions','duration') NOT NULL DEFAULT 'repetitions',
+    target_value INT NOT NULL DEFAULT 10,
+    frequency VARCHAR(50) NOT NULL DEFAULT 'Daily',
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    notes TEXT,
+    status ENUM('Assigned','In Progress','Completed','Modified','Stopped') NOT NULL DEFAULT 'Assigned',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_assignment_patient FOREIGN KEY (patient_id) REFERENCES patients(patient_id) ON DELETE CASCADE,
+    CONSTRAINT fk_assignment_therapist FOREIGN KEY (therapist_id) REFERENCES therapists(therapist_id) ON DELETE CASCADE,
+    CONSTRAINT fk_assignment_exercise FOREIGN KEY (exercise_id) REFERENCES exercises(exercise_id) ON DELETE CASCADE,
+    INDEX idx_assignment_patient (patient_id),
+    INDEX idx_assignment_therapist (therapist_id),
+    INDEX idx_assignment_status (status)
+);

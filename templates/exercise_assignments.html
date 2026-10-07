@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3"><div><h2>Exercise Assignments</h2><p class="text-muted mb-0">Therapist-controlled exercises for individual patients.</p></div></div>
+<div class="card p-4 mb-4">
+<h5 class="mb-3">Assign Exercise</h5>
+<form method="post" action="{{ url_for('add_exercise_assignment') }}" class="row g-3">
+<div class="col-md-4"><label class="form-label">Patient</label><select name="patient_id" class="form-select" required><option value="">Select patient</option>{% for p in patients %}<option value="{{p.patient_id}}">{{p.name}}</option>{% endfor %}</select></div>
+<div class="col-md-4"><label class="form-label">Therapist</label><select name="therapist_id" class="form-select" required><option value="">Select therapist</option>{% for t in therapists %}<option value="{{t.therapist_id}}">{{t.name}}</option>{% endfor %}</select></div>
+<div class="col-md-4"><label class="form-label">Exercise</label><select name="exercise_id" class="form-select" required><option value="">Select exercise</option>{% for e in exercises %}<option value="{{e.exercise_id}}">{{e.exercise_name}}</option>{% endfor %}</select></div>
+<div class="col-md-3"><label class="form-label">Difficulty</label><select name="difficulty" class="form-select"><option>Easy</option><option selected>Medium</option><option>Hard</option></select></div>
+<div class="col-md-3"><label class="form-label">Target Type</label><select name="target_type" class="form-select"><option value="repetitions">Repetitions</option><option value="duration">Duration (seconds)</option></select></div>
+<div class="col-md-2"><label class="form-label">Value</label><input type="number" name="target_value" class="form-control" value="10" min="1" required></div>
+<div class="col-md-4"><label class="form-label">Frequency</label><select name="frequency" class="form-select"><option>Daily</option><option>5 days/week</option><option>3 days/week</option><option>Twice daily</option><option>As advised</option></select></div>
+<div class="col-md-3"><label class="form-label">Start Date</label><input type="date" name="start_date" class="form-control" required></div>
+<div class="col-md-3"><label class="form-label">End Date</label><input type="date" name="end_date" class="form-control" required></div>
+<div class="col-md-3"><label class="form-label">Status</label><select name="status" class="form-select"><option selected>Assigned</option><option>In Progress</option><option>Completed</option><option>Modified</option><option>Stopped</option></select></div>
+<div class="col-md-12"><label class="form-label">Therapist Notes</label><textarea name="notes" class="form-control" rows="2" placeholder="Instructions, precautions, or goals..."></textarea></div>
+<div class="col-12"><button class="btn btn-primary px-4">＋ Assign Exercise</button></div>
+</form></div>
+<div class="card p-3"><div class="table-responsive"><table class="table table-hover align-middle"><thead><tr><th>Patient</th><th>Therapist</th><th>Exercise</th><th>Target</th><th>Frequency</th><th>Dates</th><th>Difficulty</th><th>Status</th><th>Action</th></tr></thead><tbody>
+{% for r in rows %}<tr><td><strong>{{r.patient_name}}</strong></td><td>{{r.therapist_name}}</td><td>{{r.exercise_name}}</td><td>{{r.target_value}} {{'reps' if r.target_type=='repetitions' else 'sec'}}</td><td>{{r.frequency}}</td><td>{{r.start_date}} → {{r.end_date}}</td><td><span class="badge text-bg-light">{{r.difficulty}}</span></td><td><span class="badge {% if r.status=='Completed' %}text-bg-success{% elif r.status=='Stopped' %}text-bg-danger{% elif r.status=='In Progress' %}text-bg-warning{% else %}text-bg-primary{% endif %}">{{r.status}}</span></td><td><form method="post" action="{{url_for('update_assignment_status',assignment_id=r.assignment_id)}}" class="d-flex gap-1"><select name="status" class="form-select form-select-sm"><option>Assigned</option><option>In Progress</option><option>Completed</option><option>Modified</option><option>Stopped</option></select><button class="btn btn-sm btn-outline-primary">Update</button></form></td></tr>
+{% else %}<tr><td colspan="9" class="text-center text-muted py-4">No exercise assignments yet.</td></tr>{% endfor %}
+</tbody></table></div></div>
+{% endblock %}

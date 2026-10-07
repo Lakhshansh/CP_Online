@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container py-4" style="max-width:520px">
+  <div class="card shadow-sm p-4">
+    <h3 class="mb-2">Verify Doctor Email</h3>
+    <p class="text-muted">OTP sent to <strong>{{ email }}</strong></p>
+    <form method="post" action="{{ url_for('verify_doctor_otp') }}">
+      <input class="form-control form-control-lg text-center mb-3" name="email_otp" maxlength="6" inputmode="numeric" pattern="[0-9]{6}" placeholder="Enter 6-digit OTP" required>
+      <button class="btn btn-primary w-100" type="submit">✓ Verify & Add Doctor</button>
+    </form>
+    <form method="post" action="{{ url_for('resend_doctor_otp') }}" class="mt-2">
+      <button class="btn btn-outline-secondary w-100" type="submit">↻ Resend OTP</button>
+    </form>
+    <a class="btn btn-link w-100 mt-2" href="{{ url_for('list_module', module='doctors') }}">Back to Doctors</a>
+  </div>
+</div>
+{% endblock %}
