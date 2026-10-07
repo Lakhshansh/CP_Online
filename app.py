@@ -4088,3 +4088,93 @@ def api_dashboard():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/profile', methods=['GET', 'POST', 'OPTIONS'])
+def api_profile():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        user_id = request.args.get('user_id') or session.get('user_id')
+        username = request.args.get('username') or session.get('user')
+
+        if not user_id and not username:
+            return jsonify({'success': False, 'message': 'User identifier required.'}), 400
+
+        if user_id:
+            user = query('''
+                SELECT user_id, username, email, phone, hospital_name,
+                       hospital_address, city, state, registration_number,
+                       doctor_name, doctor_specialization, role, profile_photo
+                FROM users
+                WHERE user_id=%s
+            ''', (user_id,), one=True)
+        else:
+            user = query('''
+                SELECT user_id, username, email, phone, hospital_name,
+                       hospital_address, city, state, registration_number,
+                       doctor_name, doctor_specialization, role, profile_photo
+                FROM users
+                WHERE LOWER(username)=LOWER(%s)
+            ''', (username,), one=True)
+
+        if not user:
+            return jsonify({'success': False, 'message': 'User profile not found.'}), 404
+
+        return jsonify({'success': True, 'user': user})
+
+    # POST - Update profile
+    data = request.get_json(silent=True) or {}
+    user_id = data.get('user_id') or session.get('user_id')
+    username = data.get('username') or session.get('user')
+
+    if not user_id and not username:
+        return jsonify({'success': False, 'message': 'User identifier required.'}), 400
+
+    phone = str(data.get('phone', '')).strip() or None
+    email = str(data.get('email', '')).strip() or None
+    hospital_name = str(data.get('hospital_name', '')).strip() or None
+    doctor_name = str(data.get('doctor_name', '')).strip() or None
+    doctor_specialization = str(data.get('doctor_specialization', '')).strip() or None
+    hospital_address = str(data.get('hospital_address', '')).strip() or None
+    city = str(data.get('city', '')).strip() or None
+    state = str(data.get('state', '')).strip() or None
+    registration_number = str(data.get('registration_number', '')).strip() or None
+
+    try:
+        if user_id:
+            query('''
+                UPDATE users
+                SET phone=%s, email=%s, hospital_name=%s, doctor_name=%s,
+                    doctor_specialization=%s, hospital_address=%s, city=%s,
+                    state=%s, registration_number=%s
+                WHERE user_id=%s
+            ''', (phone, email, hospital_name, doctor_name, doctor_specialization,
+                  hospital_address, city, state, registration_number, user_id))
+        else:
+            query('''
+                UPDATE users
+                SET phone=%s, email=%s, hospital_name=%s, doctor_name=%s,
+                    doctor_specialization=%s, hospital_address=%s, city=%s,
+                    state=%s, registration_number=%s
+                WHERE LOWER(username)=LOWER(%s)
+            ''', (phone, email, hospital_name, doctor_name, doctor_specialization,
+                  hospital_address, city, state, registration_number, username))
+
+        # Fetch updated user
+        updated_user = query('''
+            SELECT user_id, username, email, phone, hospital_name,
+                   hospital_address, city, state, registration_number,
+                   doctor_name, doctor_specialization, role, profile_photo
+            FROM users
+            WHERE ''' + ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
+            (user_id or username,), one=True)
+
+        return jsonify({
+            'success': True,
+            'message': 'Profile updated successfully!',
+            'user': updated_user
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to update profile: {str(e)}'}), 500
