@@ -4225,3 +4225,88 @@ def api_upload_profile_photo():
 
     except Exception as e:
         return jsonify({'success': False, 'message': f'Upload failed: {str(e)}'}), 500
+
+
+@app.route('/api/patients', methods=['GET', 'POST', 'OPTIONS'])
+def api_patients():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            if user_id and str(role).lower() != 'admin':
+                rows = query('''
+                    SELECT patient_id, name, age, gender, contact, email,
+                           otp_verified, address, disability_details, registration_date
+                    FROM patients
+                    WHERE user_id=%s
+                    ORDER BY patient_id DESC
+                ''', (user_id,))
+            else:
+                rows = query('''
+                    SELECT patient_id, name, age, gender, contact, email,
+                           otp_verified, address, disability_details, registration_date
+                    FROM patients
+                    ORDER BY patient_id DESC
+                ''')
+
+            # Format dates for json
+            for r in rows:
+                if 'registration_date' in r and r['registration_date']:
+                    r['registration_date'] = str(r['registration_date'])
+
+            return jsonify({'success': True, 'patients': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add new patient
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    age = data.get('age')
+    gender = str(data.get('gender', '')).strip()
+    contact = str(data.get('contact', '')).strip()
+    email = str(data.get('email', '')).strip() or None
+    address = str(data.get('address', '')).strip()
+    disability_details = str(data.get('disability_details', '')).strip()
+    reg_date = data.get('registration_date') or str(datetime.date.today())
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Patient name is required.'}), 400
+
+    try:
+        query('''
+            INSERT INTO patients (name, age, gender, contact, email, address,
+                                 disability_details, registration_date, otp_verified, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s)
+        ''', (name, age, gender, contact, email, address, disability_details, reg_date, user_id))
+
+        return jsonify({'success': True, 'message': 'Patient added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add patient: {str(e)}'}), 500
+
+
+@app.route('/api/patients/<int:patient_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/patients/delete', methods=['POST', 'OPTIONS'])
+def api_delete_patient(patient_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if not patient_id:
+        data = request.get_json(silent=True) or {}
+        patient_id = data.get('patient_id') or data.get('item_id')
+
+    if not patient_id:
+        return jsonify({'success': False, 'message': 'Patient ID required.'}), 400
+
+    try:
+        # Delete dependent appointments or sessions if needed or delete patient
+        query('DELETE FROM appointments WHERE patient_id=%s', (patient_id,))
+        query('DELETE FROM therapy_sessions WHERE patient_id=%s', (patient_id,))
+        query('DELETE FROM patients WHERE patient_id=%s', (patient_id,))
+        return jsonify({'success': True, 'message': 'Patient deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete patient: {str(e)}'}), 500
