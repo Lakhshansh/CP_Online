@@ -55,7 +55,13 @@ CORS(
     origins=[
         VERCEL_FRONTEND_URL,
         "http://localhost:3000",
-        "http://127.0.0.1:3000"
+        "http://127.0.0.1:3000",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:5000",
+        "http://127.0.0.1:5000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000"
     ]
 )
 
@@ -189,6 +195,14 @@ DB = dict(
     cursorclass=pymysql.cursors.DictCursor,
     autocommit=True
 )
+
+# Automatically enable SSL for cloud databases (TiDB Cloud, Aiven, etc.)
+if os.getenv('DB_SSL', '').lower() in ('true', '1', 'yes') or any(h in DB['host'].lower() for h in ['tidbcloud', 'aivencloud', 'railway']):
+    try:
+        import certifi
+        DB['ssl'] = {'ca': certifi.where()}
+    except Exception:
+        DB['ssl'] = {'ssl_mode': 'REQUIRED'}
 
 
 # =========================================================
