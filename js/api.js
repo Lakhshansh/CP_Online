@@ -9,7 +9,7 @@ const isLocalhost = Boolean(
 const API_BASE_URL =
   window.VITE_API_BASE_URL ||
   localStorage.getItem("API_BASE_URL") ||
-  (isLocalhost ? "http://127.0.0.1:5000" : "https://YOUR-FLASK-BACKEND-DOMAIN");
+  (isLocalhost ? "http://127.0.0.1:5000" : "https://cp-backend-t590.onrender.com");
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
