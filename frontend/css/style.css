@@ -1,0 +1,732 @@
+/* ==============================
+   NAVBAR
+   ============================== */
+
+.navbar {
+    min-height: 58px;
+    padding: 6px 14px;
+}
+
+.navbar-logo {
+    width: 42px !important;
+    height: 42px !important;
+    object-fit: contain;
+    display: block;
+    margin-right: 10px;
+    border-radius: 6px;
+}
+
+.navbar-brand {
+    display: flex !important;
+    align-items: center;
+    font-size: 23px;
+    line-height: 1;
+}
+
+
+/* ==============================
+   LOGIN PAGE LOGO
+   ============================== */
+
+.login-logo {
+    width: 150px;
+    height: 150px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+}
+
+.navbar-brand {
+    display: flex;
+    align-items: center;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+}
+
+body {
+    background: #f5f7fb;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    color: #26354d;
+}
+
+
+/* =========================================================
+   NAVBAR
+   ========================================================= */
+
+.navbar {
+    min-height: 56px;
+}
+
+.navbar-brand {
+    font-size: 20px;
+}
+
+
+/* =========================================================
+   SIDEBAR
+   ========================================================= */
+
+.sidebar {
+    min-height: calc(100vh - 56px);
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    padding: 18px !important;
+}
+                 
+      .captcha-image {
+    width: 400px !important;
+    height: 100px !important;
+}
+
+.sidebar a {
+    display: block;
+    padding: 12px 10px;
+    text-decoration: none;
+    color: #26354d;
+    border-radius: 9px;
+    margin-bottom: 5px;
+    font-size: 15px;
+    transition: all 0.2s ease;
+}
+
+.sidebar a:hover {
+    background: #e7f1ff;
+    color: #0b5ed7;
+    transform: translateX(2px);
+}
+
+
+/* =========================================================
+   MAIN CONTENT
+   ========================================================= */
+
+main {
+    min-height: calc(100vh - 56px);
+}
+
+
+/* =========================================================
+   LOGIN / SIGNUP PAGE
+   ========================================================= */
+
+.login-card {
+    width: 100%;
+    max-width: 430px;
+
+    margin: 7vh auto;
+
+    background: #ffffff;
+
+    padding: 35px;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================================================
+   LOGO
+   ========================================================= */
+
+.logo-box {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 18px;
+}
+
+.login-logo {
+    width: 130px;
+    height: 130px;
+
+    object-fit: contain;
+
+    display: block;
+
+    margin: 0 auto;
+}
+
+
+/* =========================================================
+   LOGIN HEADING
+   ========================================================= */
+
+.login-card h2 {
+    text-align: center;
+
+    font-size: 24px;
+
+    font-weight: 700;
+
+    line-height: 1.3;
+
+    color: #1f2937;
+
+    margin-bottom: 8px;
+}
+
+.login-card p {
+    text-align: center;
+    font-size: 15px;
+}
+
+
+/* =========================================================
+   INPUT FIELDS
+   ========================================================= */
+
+.login-card .form-control {
+    width: 100%;
+
+    height: 48px;
+
+    padding: 10px 14px;
+
+    font-size: 15px;
+
+    border-radius: 10px;
+
+    border: 1px solid #d9dee8;
+
+    background: #ffffff;
+
+    transition: all 0.2s ease;
+}
+
+.login-card .form-control:focus {
+    border-color: #0d6efd;
+
+    box-shadow:
+        0 0 0 3px rgba(13, 110, 253, 0.10);
+
+    outline: none;
+}
+
+
+/* =========================================================
+   ALL LOGIN BUTTONS
+   ========================================================= */
+
+.login-card .btn {
+    width: 100%;
+
+    min-height: 48px;
+
+    border-radius: 10px;
+
+    font-size: 16px;
+
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition: all 0.25s ease;
+}
+
+
+/* =========================================================
+   LOGIN BUTTON
+   ========================================================= */
+
+.login-card .btn-primary {
+    background: #0d6efd;
+
+    border: none;
+
+    color: #ffffff;
+}
+
+.login-card .btn-primary:hover {
+    background: #0b5ed7;
+
+    transform: translateY(-2px);
+
+    box-shadow:
+        0 6px 15px rgba(13, 110, 253, 0.30);
+}
+
+
+/* =========================================================
+   SIGN UP BUTTON
+   ========================================================= */
+
+.login-card .btn-outline-success {
+    background:#0d6efd;
+
+
+    border: 2px solid #0d6efd;
+    color: #e5e6e8;
+
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    text-decoration: none;
+}
+
+.login-card .btn-outline-success:hover {
+    background: #0d6efd;
+
+    color: #ebe4e4;
+
+    transform: translateY(-2px);
+
+}
+
+
+/* =========================================================
+   BACK TO LOGIN
+   ========================================================= */
+
+.login-card .btn-outline-primary {
+    border-width: 2px;
+
+    color: #0d6efd;
+
+    background: #0b5ed7;
+}
+
+.login-card .btn-outline-primary:hover {
+    background: #0d6efd;
+
+    color: #ffffff;
+
+    transform: translateY(-2px);
+}
+
+
+/* =========================================================
+   REMEMBER ME + FORGOT PASSWORD
+   ========================================================= */
+
+.login-options {
+    width: 100%;
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+    margin: 4px 0 16px;
+
+    font-size: 14px;
+}
+
+.remember-me {
+    display: flex;
+
+    align-items: center;
+
+    gap: 7px;
+
+    cursor: pointer;
+
+    color: #4b5563;
+}
+
+.remember-me input {
+    width: 16px;
+    height: 16px;
+
+    cursor: pointer;
+}
+
+.forgot-password {
+    color: #0d6efd;
+
+    text-decoration: none;
+
+    font-weight: 600;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+
+/* =========================================================
+   FORGOT PASSWORD CARD
+   ========================================================= */
+
+.forgot-card {
+    width: 100%;
+
+    max-width: 430px;
+
+    margin: 10vh auto;
+
+    background: #ffffff;
+
+    padding: 35px;
+
+    border-radius: 18px;
+
+    box-shadow:
+        0 5px 25px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================================================
+   STAT CARDS
+   ========================================================= */
+
+.stat {
+    padding: 20px;
+
+    border: 0;
+
+    border-radius: 16px;
+
+    background: #ffffff;
+
+    box-shadow:
+        0 3px 15px rgba(0, 0, 0, 0.05);
+}
+
+
+/* =========================================================
+   GENERAL CARD
+   ========================================================= */
+
+.card {
+    border: 0;
+
+    border-radius: 14px;
+
+    box-shadow:
+        0 3px 15px rgba(0, 0, 0, 0.05);
+}
+
+
+/* =========================================================
+   TABLE
+   ========================================================= */
+
+table {
+    vertical-align: middle;
+}
+
+.table {
+    background: #ffffff;
+}
+
+
+/* =========================================================
+   ALERT
+   ========================================================= */
+
+.alert {
+    border-radius: 10px;
+
+    font-size: 14px;
+}
+
+
+/* =========================================================
+   MOBILE
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .sidebar {
+        min-height: auto;
+
+        border-right: none;
+
+        border-bottom: 1px solid #b9d0ff;
+    }
+
+    main {
+        min-height: auto;
+    }
+
+    .login-card {
+        max-width: calc(100% - 30px);
+
+        margin: 35px auto;
+
+        padding: 28px 22px;
+    }
+
+    .login-logo {
+        width: 110px;
+        height: 110px;
+    }
+
+    .login-card h2 {
+        font-size: 21px;
+    }
+
+    .login-options {
+        font-size: 13px;
+    }
+}
+
+
+/* =========================================================
+   SMALL MOBILE
+   ========================================================= */
+
+@media (max-width: 400px) {
+
+    .login-card {
+        padding: 22px 17px;
+    }
+
+    .login-logo {
+        width: 95px;
+        height: 95px;
+    }
+
+    .login-card h2 {
+        font-size: 19px;
+    }
+
+    .login-card .btn {
+        min-height: 45px;
+        font-size: 15px;
+    }
+
+    .login-card .form-control {
+        height: 45px;
+    }
+}
+
+/* =========================================================
+   USER PROFILE
+   ========================================================= */
+
+.profile-page {
+    padding: 25px;
+}
+
+.profile-header {
+    margin-bottom: 25px;
+}
+
+.profile-header h2 {
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 5px;
+}
+
+.profile-header p {
+    color: #6c757d;
+    margin: 0;
+}
+
+.profile-card {
+    background: #ffffff;
+    border-radius: 18px;
+    overflow: hidden;
+    max-width: 1000px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+.profile-top {
+    padding: 30px;
+    display: flex;
+    align-items: center;
+    gap: 25px;
+    background: linear-gradient(135deg, #e7f1ff, #ffffff);
+    border-bottom: 1px solid #e9ecef;
+}
+
+.profile-avatar {
+    width: 105px;
+    height: 105px;
+    min-width: 105px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 44px;
+    box-shadow: 0 6px 18px rgba(13, 110, 253, 0.25);
+}
+
+.profile-name h3 {
+    margin: 0 0 6px;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.profile-name p {
+    margin: 0;
+    color: #6c757d;
+}
+
+.role-badge {
+    display: inline-block;
+    margin-top: 10px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    background: #e7f1ff;
+    color: #0d6efd;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.profile-body {
+    padding: 30px;
+}
+
+.profile-section-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    margin-bottom: 20px;
+}
+
+.profile-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+}
+
+.profile-info-box {
+    border: 1px solid #e9ecef;
+    border-radius: 12px;
+    padding: 17px;
+    background: #fafbfc;
+    transition: all 0.2s ease;
+}
+
+.profile-info-box:hover {
+    border-color: #b9d0ff;
+    transform: translateY(-1px);
+}
+
+.profile-info-label {
+    font-size: 13px;
+    color: #6c757d;
+    margin-bottom: 6px;
+}
+
+.profile-info-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: #212529;
+    word-break: break-word;
+}
+
+.profile-actions {
+    margin-top: 28px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.profile-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    padding: 11px 18px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.profile-btn:hover {
+    transform: translateY(-1px);
+    opacity: 0.92;
+}
+
+.profile-edit-btn {
+    background: #0c41d1e4;
+    color: #ffffff;
+}
+
+.profile-password-btn {
+    background: #212529;
+    color: #ffffff;
+}
+
+.profile-back-btn {
+    background: #f1f3f5;
+    color: #212529;
+}
+
+/* Profile edit form */
+
+.profile-edit-form {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 30px;
+    max-width: 1000px;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+}
+
+.profile-edit-form .form-label {
+    font-weight: 600;
+    color: #374151;
+}
+
+.profile-edit-form .form-control {
+    min-height: 46px;
+    border-radius: 10px;
+    border: 1px solid #d9dee8;
+}
+
+.profile-edit-form .form-control:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.10);
+}
+
+/* Navbar profile button */
+
+.navbar-profile-btn {
+    border-radius: 9px;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+/* Mobile profile */
+
+@media (max-width: 768px) {
+
+    .profile-page {
+        padding: 15px;
+    }
+
+    .profile-top {
+        flex-direction: column;
+        text-align: center;
+        padding: 25px 20px;
+    }
+
+    .profile-body {
+        padding: 20px;
+    }
+
+    .profile-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .profile-actions {
+        flex-direction: column;
+    }
+
+    .profile-btn {
+        width: 100%;
+    }
+}

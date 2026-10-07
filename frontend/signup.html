@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create Account - Multi Therapy Management System</title>
+  <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+  <main class="container-fluid">
+    <div class="login-card">
+      <div class="logo-box">
+        <img src="./images/logo.png" alt="Multi Therapy Management System Logo" class="login-logo">
+      </div>
+      <h2>Create Account</h2>
+      <p class="text-muted">Multi Therapy Management System</p>
+
+      <form id="signupForm">
+        <input class="form-control mb-3" name="hospital_name" type="text"
+               placeholder="Hospital Name" required>
+
+        <input class="form-control mb-3" name="phone" type="tel"
+               placeholder="10 Digit Mobile Number" maxlength="10"
+               pattern="[0-9]{10}" inputmode="numeric" required>
+
+        <input class="form-control mb-3" name="username" type="text"
+               placeholder="Username" autocomplete="username" required>
+
+        <input class="form-control mb-3" name="email" type="email"
+               placeholder="Email Address" autocomplete="email" required>
+
+        <input class="form-control mb-3" name="doctor_name" type="text"
+               placeholder="Doctor Name" required>
+
+        <select class="form-control mb-3" name="doctor_specialization" required>
+          <option value="">Doctor Specialization</option>
+          <option>Neurologist</option>
+          <option>Pediatrician</option>
+          <option>Orthopedic</option>
+          <option>Physiotherapy</option>
+          <option>Occupational Therapy</option>
+          <option>Speech Therapy</option>
+          <option>Behaviour Therapy</option>
+          <option>Rehabilitation Specialist</option>
+          <option>Other</option>
+        </select>
+
+        <div class="mb-3 text-start">
+          <label for="document_file" class="form-label fw-bold">
+            📄 Upload Doctor Document / Certificate
+          </label>
+          <input id="document_file" class="form-control" type="file"
+                 name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required>
+        </div>
+
+        <input class="form-control mb-3" name="password" type="password"
+               placeholder="Password" autocomplete="new-password" required>
+        <input class="form-control mb-3" name="confirm_password" type="password"
+               placeholder="Confirm Password" autocomplete="new-password" required>
+
+        <div id="signupMessage" class="alert" hidden></div>
+        <button type="submit" class="btn btn-primary w-100">Create Account</button>
+      </form>
+
+      <a href="./index.html" class="btn btn-outline-primary w-100 mt-2">Back to Login</a>
+    </div>
+  </main>
+  <script src="./js/api.js"></script>
+  <script src="./js/signup.js"></script>
+</body>
+</html>
