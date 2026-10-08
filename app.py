@@ -4310,3 +4310,253 @@ def api_delete_patient(patient_id=None):
         return jsonify({'success': True, 'message': 'Patient deleted successfully!'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to delete patient: {str(e)}'}), 500
+
+
+# ==========================================
+# API: DOCTORS
+# ==========================================
+@app.route('/api/doctors', methods=['GET', 'POST', 'OPTIONS'])
+def api_doctors():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            if user_id and str(role).lower() != 'admin':
+                rows = query("""
+                    SELECT doctor_id, name, specialization, contact, email,
+                           otp_verified, user_id
+                    FROM doctors
+                    WHERE user_id=%s
+                    ORDER BY doctor_id DESC
+                """, (user_id,))
+            else:
+                rows = query("""
+                    SELECT doctor_id, name, specialization, contact, email,
+                           otp_verified, user_id
+                    FROM doctors
+                    ORDER BY doctor_id DESC
+                """)
+            return jsonify({'success': True, 'doctors': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Direct Add (or after OTP)
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    specialization = str(data.get('specialization', '')).strip()
+    contact = str(data.get('contact', '')).strip()
+    email = str(data.get('email', '')).strip().lower()
+    user_id = data.get('user_id') or session.get('user_id')
+    otp_verified = 1 if data.get('otp_verified') is not False else 0
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Doctor name is required.'}), 400
+    if not specialization:
+        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
+    if not contact:
+        return jsonify({'success': False, 'message': 'Contact number is required.'}), 400
+    if not email:
+        return jsonify({'success': False, 'message': 'Doctor email is required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (name, specialization, contact, email, otp_verified, user_id))
+        return jsonify({'success': True, 'message': 'Doctor added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/send-otp', methods=['POST', 'OPTIONS'])
+def api_send_doctor_otp():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    specialization = str(data.get('specialization', '')).strip()
+    contact = str(data.get('contact', '')).strip()
+    email = str(data.get('email', '')).strip().lower()
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Doctor name is required.'}), 400
+    if not specialization:
+        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
+    if not contact or len(contact) != 10 or not contact.isdigit():
+        return jsonify({'success': False, 'message': 'Contact must be a 10-digit number.'}), 400
+    if not email or '@' not in email:
+        return jsonify({'success': False, 'message': 'Valid doctor email is required.'}), 400
+
+    otp = f"{random.randint(100000, 999999)}"
+    delivered = False
+    try:
+        delivered = send_email_otp(email, otp)
+    except Exception as ex:
+        print("Doctor OTP email error:", ex)
+
+    s = get_reset_serializer()
+    doctor_token = s.dumps({
+        'name': name,
+        'specialization': specialization,
+        'contact': contact,
+        'email': email,
+        'user_id': user_id,
+        'otp': otp
+    })
+
+    if delivered:
+        return jsonify({
+            'success': True,
+            'message': f'OTP sent successfully to {email}. Valid for 10 minutes.',
+            'doctor_token': doctor_token
+        }), 200
+    else:
+        return jsonify({
+            'success': True,
+            'message': f'Email OTP generated. (If email delivery is restricted, test OTP: {otp})',
+            'demo_otp': otp,
+            'doctor_token': doctor_token
+        }), 200
+
+
+@app.route('/api/doctors/verify-otp', methods=['POST', 'OPTIONS'])
+def api_verify_doctor_otp():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    data = request.get_json(silent=True) or {}
+    entered_otp = str(data.get('otp', '')).strip()
+    doctor_token = data.get('doctor_token')
+
+    if not doctor_token:
+        return jsonify({'success': False, 'message': 'Registration session missing. Please send OTP again.'}), 400
+    if not entered_otp:
+        return jsonify({'success': False, 'message': 'Please enter the 6-digit OTP.'}), 400
+
+    try:
+        s = get_reset_serializer()
+        payload = s.loads(doctor_token, max_age=600)
+    except Exception:
+        return jsonify({'success': False, 'message': 'OTP has expired or token is invalid. Please request a new OTP.'}), 400
+
+    saved_otp = str(payload.get('otp', ''))
+    if entered_otp != saved_otp:
+        return jsonify({'success': False, 'message': 'Invalid OTP. Please check and try again.'}), 400
+
+    name = payload.get('name')
+    specialization = payload.get('specialization')
+    contact = payload.get('contact')
+    email = payload.get('email')
+    user_id = payload.get('user_id')
+
+    try:
+        query("""
+            INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
+            VALUES (%s, %s, %s, %s, 1, %s)
+        """, (name, specialization, contact, email, user_id))
+        return jsonify({'success': True, 'message': f'Doctor {name} added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500
+
+
+@app.route('/api/doctors/<int:doctor_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/doctors/delete', methods=['POST', 'OPTIONS'])
+def api_delete_doctor(doctor_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if not doctor_id:
+        data = request.get_json(silent=True) or {}
+        doctor_id = data.get('doctor_id') or data.get('item_id')
+
+    if not doctor_id:
+        return jsonify({'success': False, 'message': 'Doctor ID required.'}), 400
+
+    try:
+        query('DELETE FROM appointments WHERE doctor_id=%s', (doctor_id,))
+        query('DELETE FROM doctors WHERE doctor_id=%s', (doctor_id,))
+        return jsonify({'success': True, 'message': 'Doctor deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete doctor: {str(e)}'}), 500
+
+
+# ==========================================
+# API: THERAPISTS
+# ==========================================
+@app.route('/api/therapists', methods=['GET', 'POST', 'OPTIONS'])
+def api_therapists():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            if user_id and str(role).lower() != 'admin':
+                rows = query("""
+                    SELECT therapist_id, name, specialization, contact, user_id
+                    FROM therapists
+                    WHERE user_id=%s
+                    ORDER BY therapist_id DESC
+                """, (user_id,))
+            else:
+                rows = query("""
+                    SELECT therapist_id, name, specialization, contact, user_id
+                    FROM therapists
+                    ORDER BY therapist_id DESC
+                """)
+            return jsonify({'success': True, 'therapists': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add new therapist
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    specialization = str(data.get('specialization', '')).strip()
+    contact = str(data.get('contact', '')).strip()
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Therapist name is required.'}), 400
+    if not specialization:
+        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
+    if not contact:
+        return jsonify({'success': False, 'message': 'Contact is required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO therapists (name, specialization, contact, user_id)
+            VALUES (%s, %s, %s, %s)
+        """, (name, specialization, contact, user_id))
+        return jsonify({'success': True, 'message': 'Therapist added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add therapist: {str(e)}'}), 500
+
+
+@app.route('/api/therapists/<int:therapist_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/therapists/delete', methods=['POST', 'OPTIONS'])
+def api_delete_therapist(therapist_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if not therapist_id:
+        data = request.get_json(silent=True) or {}
+        therapist_id = data.get('therapist_id') or data.get('item_id')
+
+    if not therapist_id:
+        return jsonify({'success': False, 'message': 'Therapist ID required.'}), 400
+
+    try:
+        query('DELETE FROM therapy_sessions WHERE therapist_id=%s', (therapist_id,))
+        query('DELETE FROM therapist_exercise_assignments WHERE therapist_id=%s', (therapist_id,))
+        query('DELETE FROM therapists WHERE therapist_id=%s', (therapist_id,))
+        return jsonify({'success': True, 'message': 'Therapist deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete therapist: {str(e)}'}), 500
