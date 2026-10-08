@@ -4560,3 +4560,457 @@ def api_delete_therapist(therapist_id=None):
         return jsonify({'success': True, 'message': 'Therapist deleted successfully!'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to delete therapist: {str(e)}'}), 500
+
+
+# ==========================================
+# API: APPOINTMENTS
+# ==========================================
+@app.route('/api/appointments', methods=['GET', 'POST', 'OPTIONS'])
+def api_appointments():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            sql = """
+                SELECT a.appointment_id, a.patient_id, a.doctor_id,
+                       a.appointment_date, a.appointment_time, a.status,
+                       p.name AS patient_name, d.name AS doctor_name
+                FROM appointments a
+                LEFT JOIN patients p ON a.patient_id = p.patient_id
+                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
+            """
+            params = ()
+            if user_id and str(role).lower() != 'admin':
+                sql += ' WHERE a.user_id=%s ORDER BY a.appointment_date DESC, a.appointment_time DESC'
+                params = (user_id,)
+            else:
+                sql += ' ORDER BY a.appointment_date DESC, a.appointment_time DESC'
+
+            rows = query(sql, params)
+            for r in rows:
+                if 'appointment_date' in r and r['appointment_date']:
+                    r['appointment_date'] = str(r['appointment_date'])
+                if 'appointment_time' in r and r['appointment_time']:
+                    r['appointment_time'] = str(r['appointment_time'])
+
+            return jsonify({'success': True, 'appointments': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Appointment
+    data = request.get_json(silent=True) or {}
+    patient_id = data.get('patient_id')
+    doctor_id = data.get('doctor_id')
+    appt_date = data.get('appointment_date')
+    appt_time = data.get('appointment_time')
+    status = data.get('status') or 'Scheduled'
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not patient_id or not doctor_id or not appt_date or not appt_time:
+        return jsonify({'success': False, 'message': 'All appointment fields are required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (patient_id, doctor_id, appt_date, appt_time, status, user_id))
+        return jsonify({'success': True, 'message': 'Appointment added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add appointment: {str(e)}'}), 500
+
+
+@app.route('/api/appointments/<int:appt_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/appointments/delete', methods=['POST', 'OPTIONS'])
+def api_delete_appointment(appt_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not appt_id:
+        data = request.get_json(silent=True) or {}
+        appt_id = data.get('appointment_id') or data.get('item_id')
+    if not appt_id:
+        return jsonify({'success': False, 'message': 'Appointment ID required.'}), 400
+    try:
+        query('DELETE FROM appointments WHERE appointment_id=%s', (appt_id,))
+        return jsonify({'success': True, 'message': 'Appointment deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete appointment: {str(e)}'}), 500
+
+
+# ==========================================
+# API: THERAPY SESSIONS
+# ==========================================
+@app.route('/api/therapy-sessions', methods=['GET', 'POST', 'OPTIONS'])
+def api_therapy_sessions():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            sql = """
+                SELECT s.session_id, s.patient_id, s.therapist_id, s.exercise_id,
+                       s.session_date, s.duration_minutes, s.notes,
+                       p.name AS patient_name, t.name AS therapist_name, e.exercise_name
+                FROM therapy_sessions s
+                LEFT JOIN patients p ON s.patient_id = p.patient_id
+                LEFT JOIN therapists t ON s.therapist_id = t.therapist_id
+                LEFT JOIN exercises e ON s.exercise_id = e.exercise_id
+            """
+            params = ()
+            if user_id and str(role).lower() != 'admin':
+                sql += ' WHERE s.user_id=%s ORDER BY s.session_date DESC, s.session_id DESC'
+                params = (user_id,)
+            else:
+                sql += ' ORDER BY s.session_date DESC, s.session_id DESC'
+
+            rows = query(sql, params)
+            for r in rows:
+                if 'session_date' in r and r['session_date']:
+                    r['session_date'] = str(r['session_date'])
+
+            return jsonify({'success': True, 'sessions': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Session
+    data = request.get_json(silent=True) or {}
+    patient_id = data.get('patient_id')
+    therapist_id = data.get('therapist_id')
+    exercise_id = data.get('exercise_id')
+    session_date = data.get('session_date')
+    duration_minutes = data.get('duration_minutes')
+    notes = data.get('notes') or ''
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not patient_id or not therapist_id or not exercise_id or not session_date or not duration_minutes:
+        return jsonify({'success': False, 'message': 'All session fields are required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO therapy_sessions (patient_id, therapist_id, exercise_id, session_date, duration_minutes, notes, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+        """, (patient_id, therapist_id, exercise_id, session_date, duration_minutes, notes, user_id))
+        return jsonify({'success': True, 'message': 'Therapy session added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add therapy session: {str(e)}'}), 500
+
+
+@app.route('/api/therapy-sessions/<int:session_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/therapy-sessions/delete', methods=['POST', 'OPTIONS'])
+def api_delete_therapy_session(session_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not session_id:
+        data = request.get_json(silent=True) or {}
+        session_id = data.get('session_id') or data.get('item_id')
+    if not session_id:
+        return jsonify({'success': False, 'message': 'Session ID required.'}), 400
+    try:
+        query('DELETE FROM therapy_sessions WHERE session_id=%s', (session_id,))
+        return jsonify({'success': True, 'message': 'Therapy session deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete session: {str(e)}'}), 500
+
+
+# ==========================================
+# API: EXERCISES
+# ==========================================
+@app.route('/api/exercises', methods=['GET', 'POST', 'OPTIONS'])
+def api_exercises():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            rows = query('SELECT exercise_id, exercise_name, description, therapy_type FROM exercises ORDER BY exercise_id ASC')
+            return jsonify({'success': True, 'exercises': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Exercise
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('exercise_name', '')).strip()
+    desc = str(data.get('description', '')).strip()
+    therapy_type = str(data.get('therapy_type', '')).strip()
+
+    if not name:
+        return jsonify({'success': False, 'message': 'Exercise name is required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO exercises (exercise_name, description, therapy_type)
+            VALUES (%s, %s, %s)
+        """, (name, desc, therapy_type))
+        return jsonify({'success': True, 'message': 'Exercise added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add exercise: {str(e)}'}), 500
+
+
+@app.route('/api/exercises/<int:exercise_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/exercises/delete', methods=['POST', 'OPTIONS'])
+def api_delete_exercise(exercise_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not exercise_id:
+        data = request.get_json(silent=True) or {}
+        exercise_id = data.get('exercise_id') or data.get('item_id')
+    if not exercise_id:
+        return jsonify({'success': False, 'message': 'Exercise ID required.'}), 400
+    try:
+        query('DELETE FROM exercises WHERE exercise_id=%s', (exercise_id,))
+        return jsonify({'success': True, 'message': 'Exercise deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete exercise: {str(e)}'}), 500
+
+
+# ==========================================
+# API: EXERCISE ASSIGNMENTS
+# ==========================================
+@app.route('/api/exercise-assignments', methods=['GET', 'POST', 'OPTIONS'])
+def api_exercise_assignments():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            sql = """
+                SELECT a.assignment_id, a.patient_id, a.therapist_id, a.exercise_id,
+                       a.difficulty, a.target_type, a.target_value, a.frequency,
+                       a.start_date, a.end_date, a.notes, a.status,
+                       p.name AS patient_name, t.name AS therapist_name, e.exercise_name
+                FROM therapist_exercise_assignments a
+                LEFT JOIN patients p ON a.patient_id = p.patient_id
+                LEFT JOIN therapists t ON a.therapist_id = t.therapist_id
+                LEFT JOIN exercises e ON a.exercise_id = e.exercise_id
+            """
+            params = ()
+            if user_id and str(role).lower() != 'admin':
+                sql += ' WHERE a.user_id=%s ORDER BY a.assignment_id DESC'
+                params = (user_id,)
+            else:
+                sql += ' ORDER BY a.assignment_id DESC'
+
+            rows = query(sql, params)
+            for r in rows:
+                if 'start_date' in r and r['start_date']:
+                    r['start_date'] = str(r['start_date'])
+                if 'end_date' in r and r['end_date']:
+                    r['end_date'] = str(r['end_date'])
+
+            return jsonify({'success': True, 'assignments': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Assignment
+    data = request.get_json(silent=True) or {}
+    patient_id = data.get('patient_id')
+    therapist_id = data.get('therapist_id')
+    exercise_id = data.get('exercise_id')
+    difficulty = data.get('difficulty') or 'Medium'
+    target_type = data.get('target_type') or 'repetitions'
+    target_value = data.get('target_value') or 10
+    frequency = data.get('frequency') or 'Daily'
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    status = data.get('status') or 'Assigned'
+    notes = data.get('notes') or ''
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not patient_id or not therapist_id or not exercise_id or not start_date or not end_date:
+        return jsonify({'success': False, 'message': 'Required assignment fields missing.'}), 400
+
+    try:
+        query("""
+            INSERT INTO therapist_exercise_assignments
+            (patient_id, therapist_id, exercise_id, difficulty, target_type, target_value, frequency, start_date, end_date, notes, status, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (patient_id, therapist_id, exercise_id, difficulty, target_type, target_value, frequency, start_date, end_date, notes, status, user_id))
+        return jsonify({'success': True, 'message': 'Exercise assigned successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to assign exercise: {str(e)}'}), 500
+
+
+@app.route('/api/exercise-assignments/<int:assignment_id>/status', methods=['POST', 'OPTIONS'])
+def api_update_exercise_assignment_status(assignment_id):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    data = request.get_json(silent=True) or {}
+    new_status = data.get('status')
+    if not new_status:
+        return jsonify({'success': False, 'message': 'Status required.'}), 400
+    try:
+        query('UPDATE therapist_exercise_assignments SET status=%s WHERE assignment_id=%s', (new_status, assignment_id))
+        return jsonify({'success': True, 'message': 'Status updated successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/exercise-assignments/<int:assignment_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/exercise-assignments/delete', methods=['POST', 'OPTIONS'])
+def api_delete_exercise_assignment(assignment_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not assignment_id:
+        data = request.get_json(silent=True) or {}
+        assignment_id = data.get('assignment_id') or data.get('item_id')
+    if not assignment_id:
+        return jsonify({'success': False, 'message': 'Assignment ID required.'}), 400
+    try:
+        query('DELETE FROM therapist_exercise_assignments WHERE assignment_id=%s', (assignment_id,))
+        return jsonify({'success': True, 'message': 'Assignment deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete assignment: {str(e)}'}), 500
+
+
+# ==========================================
+# API: CAREGIVERS
+# ==========================================
+@app.route('/api/caregivers', methods=['GET', 'POST', 'OPTIONS'])
+def api_caregivers():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            sql = """
+                SELECT c.caregiver_id, c.patient_id, c.caregiver_name,
+                       c.relationship, c.contact, c.emergency_contact, c.user_id,
+                       p.name AS patient_name
+                FROM caregivers c
+                LEFT JOIN patients p ON c.patient_id = p.patient_id
+            """
+            params = ()
+            if user_id and str(role).lower() != 'admin':
+                sql += ' WHERE c.user_id=%s ORDER BY c.caregiver_id DESC'
+                params = (user_id,)
+            else:
+                sql += ' ORDER BY c.caregiver_id DESC'
+
+            rows = query(sql, params)
+            return jsonify({'success': True, 'caregivers': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Caregiver
+    data = request.get_json(silent=True) or {}
+    patient_id = data.get('patient_id')
+    name = str(data.get('caregiver_name', '')).strip()
+    relationship = str(data.get('relationship', '')).strip()
+    contact = str(data.get('contact', '')).strip()
+    emergency_contact = str(data.get('emergency_contact', '')).strip()
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not patient_id or not name or not contact:
+        return jsonify({'success': False, 'message': 'Patient, caregiver name, and contact are required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO caregivers (patient_id, caregiver_name, relationship, contact, emergency_contact, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (patient_id, name, relationship, contact, emergency_contact, user_id))
+        return jsonify({'success': True, 'message': 'Caregiver added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add caregiver: {str(e)}'}), 500
+
+
+@app.route('/api/caregivers/<int:caregiver_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/caregivers/delete', methods=['POST', 'OPTIONS'])
+def api_delete_caregiver(caregiver_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not caregiver_id:
+        data = request.get_json(silent=True) or {}
+        caregiver_id = data.get('caregiver_id') or data.get('item_id')
+    if not caregiver_id:
+        return jsonify({'success': False, 'message': 'Caregiver ID required.'}), 400
+    try:
+        query('DELETE FROM caregivers WHERE caregiver_id=%s', (caregiver_id,))
+        return jsonify({'success': True, 'message': 'Caregiver deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete caregiver: {str(e)}'}), 500
+
+
+# ==========================================
+# API: PROGRESS REPORTS
+# ==========================================
+@app.route('/api/progress-reports', methods=['GET', 'POST', 'OPTIONS'])
+def api_progress_reports():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        try:
+            user_id = request.args.get('user_id')
+            role = request.args.get('role')
+
+            sql = """
+                SELECT pr.report_id, pr.patient_id, pr.report_date,
+                       pr.mobility_score, pr.improvement_notes, pr.user_id,
+                       p.name AS patient_name
+                FROM progress_reports pr
+                LEFT JOIN patients p ON pr.patient_id = p.patient_id
+            """
+            params = ()
+            if user_id and str(role).lower() != 'admin':
+                sql += ' WHERE pr.user_id=%s ORDER BY pr.report_id DESC'
+                params = (user_id,)
+            else:
+                sql += ' ORDER BY pr.report_id DESC'
+
+            rows = query(sql, params)
+            for r in rows:
+                if 'report_date' in r and r['report_date']:
+                    r['report_date'] = str(r['report_date'])
+
+            return jsonify({'success': True, 'reports': rows or []})
+        except Exception as e:
+            return jsonify({'success': False, 'message': str(e)}), 500
+
+    # POST - Add Report
+    data = request.get_json(silent=True) or {}
+    patient_id = data.get('patient_id')
+    report_date = data.get('report_date')
+    mobility_score = data.get('mobility_score')
+    notes = data.get('improvement_notes') or ''
+    user_id = data.get('user_id') or session.get('user_id')
+
+    if not patient_id or not report_date:
+        return jsonify({'success': False, 'message': 'Patient and report date are required.'}), 400
+
+    try:
+        query("""
+            INSERT INTO progress_reports (patient_id, report_date, mobility_score, improvement_notes, user_id)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (patient_id, report_date, mobility_score, notes, user_id))
+        return jsonify({'success': True, 'message': 'Progress report added successfully!'}), 201
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to add report: {str(e)}'}), 500
+
+
+@app.route('/api/progress-reports/<int:report_id>', methods=['DELETE', 'OPTIONS'])
+@app.route('/api/progress-reports/delete', methods=['POST', 'OPTIONS'])
+def api_delete_progress_report(report_id=None):
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+    if not report_id:
+        data = request.get_json(silent=True) or {}
+        report_id = data.get('report_id') or data.get('item_id')
+    if not report_id:
+        return jsonify({'success': False, 'message': 'Report ID required.'}), 400
+    try:
+        query('DELETE FROM progress_reports WHERE report_id=%s', (report_id,))
+        return jsonify({'success': True, 'message': 'Progress report deleted successfully!'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to delete report: {str(e)}'}), 500
