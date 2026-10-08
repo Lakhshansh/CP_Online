@@ -19,18 +19,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Populate user info in UI
   const displayName = user.username || user.name || "User";
-  const displayRole = user.role || "Admin";
-
   const greetingEl = document.getElementById("greetingText");
-  const navUsernameEl = document.getElementById("navUsername");
-  const navRoleEl = document.getElementById("navRole");
-
   if (greetingEl) greetingEl.textContent = `Welcome, ${displayName}! 👋`;
-  if (navUsernameEl) navUsernameEl.textContent = displayName;
-  if (navRoleEl) navRoleEl.textContent = displayRole;
-  const navAvatarEl = document.getElementById("navAvatar");
-  if (navAvatarEl) {
-    navAvatarEl.textContent = (displayName.charAt(0) || "👤").toUpperCase();
+
+  if (typeof renderNavbarUser === "function") {
+    renderNavbarUser(user);
   }
 
   // Handle Logout

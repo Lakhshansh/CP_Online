@@ -11,15 +11,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Populate Navbar
-  const displayName = user.username || "User";
-  const displayRole = user.role || "Admin";
-  const navUserEl = document.getElementById("navUsername");
-  const navRoleEl = document.getElementById("navRole");
-  const navAvatarEl = document.getElementById("navAvatar");
-
-  if (navUserEl) navUserEl.textContent = displayName;
-  if (navRoleEl) navRoleEl.textContent = displayRole;
-  if (navAvatarEl) navAvatarEl.textContent = (displayName.charAt(0) || "👤").toUpperCase();
+  if (typeof renderNavbarUser === "function") {
+    renderNavbarUser(user);
+  }
 
   // Logout
   const logoutBtn = document.getElementById("logoutBtn");

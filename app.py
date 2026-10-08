@@ -3572,7 +3572,8 @@ def _api_user_payload(user):
         "email": user.get("email"),
         "phone": user.get("phone"),
         "hospital_name": user.get("hospital_name"),
-        "role": user.get("role", "Admin")
+        "role": user.get("role", "Admin"),
+        "profile_photo": user.get("profile_photo")
     }
 
 

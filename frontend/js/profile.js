@@ -241,6 +241,13 @@ function populateProfileUI(user) {
     if (navAvatarImg) {
       navAvatarImg.src = photoSrc;
       navAvatarImg.style.display = "block";
+      navAvatarImg.onerror = function () {
+        this.style.display = "none";
+        if (navAvatar) {
+          navAvatar.style.display = "flex";
+          navAvatar.textContent = (uname.charAt(0) || "👤").toUpperCase();
+        }
+      };
       if (navAvatar) navAvatar.style.display = "none";
     }
   } else {
