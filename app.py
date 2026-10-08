@@ -1,7 +1,7 @@
 from flask import (
     jsonify,
     Flask, render_template, request, redirect, url_for,
-    session, flash, send_file
+    session, flash, send_file, make_response
 )
 from flask_cors import CORS
 import pymysql
@@ -52,18 +52,18 @@ VERCEL_FRONTEND_URL = os.getenv(
 CORS(
     app,
     supports_credentials=True,
-    origins=[
-        VERCEL_FRONTEND_URL,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5500",
-        "http://127.0.0.1:5500",
-        "http://localhost:5000",
-        "http://127.0.0.1:5000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000"
-    ]
+    origins=re.compile(r".*")
 )
+
+@app.after_request
+def add_cors_headers(response):
+    origin = request.headers.get('Origin')
+    if origin:
+        response.headers['Access-Control-Allow-Origin'] = origin
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+    return response
 
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'None'
