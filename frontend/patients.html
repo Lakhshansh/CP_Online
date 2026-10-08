@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patients - Multi Therapy Management System</title>
+  <link rel="icon" href="./images/logo.png" type="image/png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <style>
+    /* Top Navbar */
+    .mt-navbar {
+      min-height: 88px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0d6efd 0%, #0867e8 100%);
+      box-shadow: 0 4px 18px rgba(0, 80, 180, 0.20);
+      position: relative;
+      z-index: 1000;
+      width: 100%;
+    }
+    .mt-navbar-inner {
+      width: 100%;
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .mt-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: #ffffff;
+    }
+    .mt-logo {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #ffffff;
+      padding: 3px;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      flex-shrink: 0;
+    }
+    .mt-brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .mt-brand-subtitle {
+      margin-top: 4px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.92);
+      letter-spacing: 0.4px;
+    }
+    .mt-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .mt-profile-btn,
+    .mt-logout-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .mt-profile-btn {
+      background: #ffffff;
+      color: #1e293b;
+    }
+    .mt-profile-btn:hover {
+      background: #f8fafc;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: #0d6efd;
+    }
+    .mt-logout-btn {
+      background: #ffffff;
+      color: #dc3545;
+    }
+    .mt-logout-btn:hover {
+      background: #fff5f5;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+      color: #b02a37;
+    }
+    .mt-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      padding-left: 14px;
+      border-left: 1px solid rgba(255, 255, 255, 0.35);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .mt-user-default {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      background: #ffffff;
+      color: #0d6efd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .mt-user-text {
+      line-height: 1.2;
+    }
+    .mt-user-name {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .mt-user-role {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      text-transform: capitalize;
+    }
+    .mt-arrow {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.85);
+      margin-left: 2px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      min-height: calc(100vh - 88px);
+      background: #ffffff;
+      border-right: 1px solid #e9ecef;
+      padding: 20px 14px !important;
+    }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: #475569;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .sidebar-link:hover {
+      background: #f1f5f9;
+      color: #0d6efd;
+      transform: translateX(3px);
+    }
+    .sidebar-link.active {
+      background: #e7f1ff;
+      color: #0d6efd;
+      font-weight: 700;
+    }
+    .sidebar-link .icon {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+    }
+
+    /* Main Page Content */
+    .main-page {
+      padding: 30px;
+      background: #f8fafc;
+      min-height: calc(100vh - 88px);
+    }
+    .page-header h1 {
+      font-size: 30px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 22px;
+    }
+
+    /* Cards */
+    .content-box {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* Form Grid */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+    .form-grid .form-control,
+    .form-grid .form-select {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      height: 44px;
+      color: #1e293b;
+    }
+    .form-grid .form-control:focus,
+    .form-grid .form-select:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    }
+    .btn-add-patient {
+      background: #0d6efd;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 22px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .btn-add-patient:hover {
+      background: #0b5ed7;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      position: relative;
+    }
+    .table thead th {
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+      padding: 11px 12px;
+      white-space: nowrap;
+    }
+    .table tbody td {
+      padding: 12px 12px;
+      vertical-align: middle;
+      font-size: 14px;
+      color: #1e293b;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+    .sticky-action {
+      position: sticky;
+      right: 0;
+      background: #ffffff;
+      box-shadow: -4px 0 10px rgba(0, 0, 0, 0.08);
+      z-index: 5;
+      text-align: center;
+      min-width: 105px;
+    }
+    thead th.sticky-action {
+      background: #f1f5f9 !important;
+    }
+    .verified-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #dcfce7;
+      color: #15803d;
+      font-size: 12px;
+      font-weight: 700;
+      border: 1px solid #bbf7d0;
+    }
+    .not-verified-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 20px;
+      background: #fef3c7;
+      color: #b45309;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .btn-delete-patient {
+      border: 1px solid #dc3545;
+      background: #dc3545;
+      color: #ffffff;
+      border-radius: 8px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(220, 53, 69, 0.25);
+    }
+    .btn-delete-patient:hover {
+      background: #b02a37;
+      border-color: #b02a37;
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+      transform: translateY(-1px);
+    }
+
+    @media (max-width: 1200px) {
+      .form-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .sidebar { min-height: auto; border-right: none; border-bottom: 1px solid #e9ecef; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Blue Navbar -->
+  <header class="mt-navbar">
+    <div class="mt-navbar-inner">
+      <a href="./dashboard.html" class="mt-brand">
+        <img src="./images/logo.png" alt="Multi Therapy Management System Logo" class="mt-logo">
+        <div>
+          <div class="mt-brand-title">Multi Therapy Management System</div>
+          <div class="mt-brand-subtitle">Care • Support • Progress • Together</div>
+        </div>
+      </a>
+
+      <div class="mt-nav-right">
+        <a href="./profile.html" class="mt-profile-btn">
+          <span>👤</span> Profile
+        </a>
+
+        <a href="./profile.html" class="mt-user" title="View Profile">
+          <div id="navAvatar" class="mt-user-default">👤</div>
+          <div class="mt-user-text">
+            <div class="mt-user-name" id="navUsername">User</div>
+            <div class="mt-user-role" id="navRole">Admin</div>
+          </div>
+          <span class="mt-arrow">⌄</span>
+        </a>
+
+        <button id="logoutBtn" class="mt-logout-btn">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout with Left Sidebar -->
+  <div class="container-fluid p-0">
+    <div class="row g-0">
+
+      <!-- Left Sidebar Navigation -->
+      <aside class="col-12 col-md-3 col-lg-2 sidebar">
+        <nav>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="./profile.html" class="sidebar-link">
+            <span class="icon">👤</span>
+            <span>My Profile</span>
+          </a>
+          <a href="./patients.html" class="sidebar-link active">
+            <span class="icon">👥</span>
+            <span>Patients</span>
+          </a>
+          <a href="./doctors.html" class="sidebar-link">
+            <span class="icon">👨‍⚕️</span>
+            <span>Doctors</span>
+          </a>
+          <a href="./therapists.html" class="sidebar-link">
+            <span class="icon">🧑‍⚕️</span>
+            <span>Therapists</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">📅</span>
+            <span>Appointments</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">💪</span>
+            <span>Therapy Sessions</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🎯</span>
+            <span>Exercise Assignments</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🏃</span>
+            <span>Exercises</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Caregivers</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">📊</span>
+            <span>Progress Reports</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="col-12 col-md-9 col-lg-10 main-page">
+        <div class="page-header">
+          <h1>Patients</h1>
+        </div>
+
+        <div id="patientAlert" class="alert alert-success mb-3" hidden></div>
+
+        <!-- Add Patient Form Card -->
+        <div class="content-box">
+          <form id="addPatientForm" autocomplete="off">
+            <div class="form-grid">
+              <div>
+                <input type="text" id="pName" class="form-control" placeholder="Name" required>
+              </div>
+              <div>
+                <input type="number" id="pAge" class="form-control" placeholder="Age" min="1" max="120" required>
+              </div>
+              <div>
+                <select id="pGender" class="form-select" required>
+                  <option value="" disabled selected>Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <input type="tel" id="pContact" class="form-control" placeholder="Contact" maxlength="10" required>
+              </div>
+              <div>
+                <input type="text" id="pAddress" class="form-control" placeholder="Address" required>
+              </div>
+              <div>
+                <input type="text" id="pDisability" class="form-control" placeholder="Disability Details" required>
+              </div>
+              <div>
+                <input type="date" id="pRegDate" class="form-control" required>
+              </div>
+              <div>
+                <input type="email" id="pEmail" class="form-control" placeholder="Email">
+              </div>
+            </div>
+
+            <button type="submit" id="btnAddPatient" class="btn-add-patient">
+              + Add
+            </button>
+          </form>
+        </div>
+
+        <!-- Patients Table Card -->
+        <div class="content-box">
+          <div class="table-wrap">
+            <table class="table mb-0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Age</th>
+                  <th>Gender</th>
+                  <th>Contact</th>
+                  <th>Address</th>
+                  <th>Disability Details</th>
+                  <th>Registration Date</th>
+                  <th>Email</th>
+                  <th>OTP Verified</th>
+                  <th class="sticky-action">Action</th>
+                </tr>
+              </thead>
+              <tbody id="patientsTableBody">
+                <tr>
+                  <td colspan="10" class="text-center text-muted py-4">Loading patients...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/patients.js"></script>
+</body>
+</html>

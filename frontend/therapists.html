@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Therapists - Multi Therapy Management System</title>
+  <link rel="icon" href="./images/logo.png" type="image/png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="./css/style.css">
+  <style>
+    /* Top Navbar */
+    .mt-navbar {
+      min-height: 88px;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #0d6efd 0%, #0867e8 100%);
+      box-shadow: 0 4px 18px rgba(0, 80, 180, 0.20);
+      position: relative;
+      z-index: 1000;
+      width: 100%;
+    }
+    .mt-navbar-inner {
+      width: 100%;
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .mt-brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: #ffffff;
+    }
+    .mt-logo {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #ffffff;
+      padding: 3px;
+      border: 2px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+      flex-shrink: 0;
+    }
+    .mt-brand-title {
+      font-size: 26px;
+      font-weight: 800;
+      line-height: 1.1;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .mt-brand-subtitle {
+      margin-top: 4px;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.92);
+      letter-spacing: 0.4px;
+    }
+    .mt-nav-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .mt-profile-btn,
+    .mt-logout-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .mt-profile-btn {
+      background: #ffffff;
+      color: #1e293b;
+    }
+    .mt-profile-btn:hover {
+      background: #f8fafc;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      color: #0d6efd;
+    }
+    .mt-logout-btn {
+      background: #ffffff;
+      color: #dc3545;
+    }
+    .mt-logout-btn:hover {
+      background: #fff5f5;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+      color: #b02a37;
+    }
+    .mt-user {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      padding-left: 14px;
+      border-left: 1px solid rgba(255, 255, 255, 0.35);
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .mt-user-default {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 2px solid #ffffff;
+      background: #ffffff;
+      color: #0d6efd;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    .mt-user-text {
+      line-height: 1.2;
+    }
+    .mt-user-name {
+      font-size: 15px;
+      font-weight: 700;
+      white-space: nowrap;
+      color: #ffffff;
+    }
+    .mt-user-role {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.85);
+      text-transform: capitalize;
+    }
+    .mt-arrow {
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.85);
+      margin-left: 2px;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      min-height: calc(100vh - 88px);
+      background: #ffffff;
+      border-right: 1px solid #e9ecef;
+      padding: 20px 14px !important;
+    }
+    .sidebar-link {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      text-decoration: none;
+      color: #475569;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      font-size: 15px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+    }
+    .sidebar-link:hover {
+      background: #f1f5f9;
+      color: #0d6efd;
+      transform: translateX(3px);
+    }
+    .sidebar-link.active {
+      background: #e7f1ff;
+      color: #0d6efd;
+      font-weight: 700;
+    }
+    .sidebar-link .icon {
+      font-size: 18px;
+      width: 22px;
+      text-align: center;
+    }
+
+    /* Main Page Content */
+    .main-page {
+      padding: 30px;
+      background: #f8fafc;
+      min-height: calc(100vh - 88px);
+    }
+    .page-header h1 {
+      font-size: 30px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-bottom: 22px;
+    }
+
+    /* Cards */
+    .content-box {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* Form Grid */
+    .therapist-form-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .therapist-form-grid .form-control {
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      height: 44px;
+      color: #1e293b;
+    }
+    .therapist-form-grid .form-control:focus {
+      border-color: #0d6efd;
+      box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+    }
+    .btn-add-therapist {
+      background: #0d6efd;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      padding: 9px 24px;
+      font-weight: 600;
+      font-size: 14px;
+      margin-top: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+    .btn-add-therapist:hover {
+      background: #0b5ed7;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      position: relative;
+    }
+    .table thead th {
+      background: #f8fafc;
+      font-size: 13px;
+      font-weight: 700;
+      color: #475569;
+      border-bottom: 2px solid #e2e8f0;
+      padding: 12px 14px;
+      white-space: nowrap;
+    }
+    .table tbody td {
+      padding: 14px 14px;
+      vertical-align: middle;
+      font-size: 14px;
+      color: #1e293b;
+      border-bottom: 1px solid #f1f5f9;
+      white-space: nowrap;
+    }
+    .sticky-action {
+      position: sticky;
+      right: 0;
+      background: #ffffff;
+      box-shadow: -4px 0 10px rgba(0, 0, 0, 0.08);
+      z-index: 5;
+      text-align: center;
+      min-width: 95px;
+    }
+    thead th.sticky-action {
+      background: #f1f5f9 !important;
+    }
+    .btn-delete-outline {
+      border: 1px solid #dc3545;
+      background: #ffffff;
+      color: #dc3545;
+      border-radius: 6px;
+      padding: 5px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-delete-outline:hover {
+      background: #dc3545;
+      color: #ffffff;
+    }
+
+    @media (max-width: 1200px) {
+      .therapist-form-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .therapist-form-grid { grid-template-columns: 1fr; }
+      .sidebar { min-height: auto; border-right: none; border-bottom: 1px solid #e9ecef; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Blue Navbar -->
+  <header class="mt-navbar">
+    <div class="mt-navbar-inner">
+      <a href="./dashboard.html" class="mt-brand">
+        <img src="./images/logo.png" alt="Multi Therapy Management System Logo" class="mt-logo">
+        <div>
+          <div class="mt-brand-title">Multi Therapy Management System</div>
+          <div class="mt-brand-subtitle">Care • Support • Progress • Together</div>
+        </div>
+      </a>
+
+      <div class="mt-nav-right">
+        <a href="./profile.html" class="mt-profile-btn">
+          <span>👤</span> Profile
+        </a>
+
+        <a href="./profile.html" class="mt-user" title="View Profile">
+          <div id="navAvatar" class="mt-user-default">👤</div>
+          <div class="mt-user-text">
+            <div class="mt-user-name" id="navUsername">User</div>
+            <div class="mt-user-role" id="navRole">Admin</div>
+          </div>
+          <span class="mt-arrow">⌄</span>
+        </a>
+
+        <button id="logoutBtn" class="mt-logout-btn">
+          <span>🚪</span> Logout
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout with Left Sidebar -->
+  <div class="container-fluid p-0">
+    <div class="row g-0">
+
+      <!-- Left Sidebar Navigation -->
+      <aside class="col-12 col-md-3 col-lg-2 sidebar">
+        <nav>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🏠</span>
+            <span>Dashboard</span>
+          </a>
+          <a href="./profile.html" class="sidebar-link">
+            <span class="icon">👤</span>
+            <span>My Profile</span>
+          </a>
+          <a href="./patients.html" class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Patients</span>
+          </a>
+          <a href="./doctors.html" class="sidebar-link">
+            <span class="icon">👨‍⚕️</span>
+            <span>Doctors</span>
+          </a>
+          <a href="./therapists.html" class="sidebar-link active">
+            <span class="icon">🧑‍⚕️</span>
+            <span>Therapists</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">📅</span>
+            <span>Appointments</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">💪</span>
+            <span>Therapy Sessions</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🎯</span>
+            <span>Exercise Assignments</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">🏃</span>
+            <span>Exercises</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">👥</span>
+            <span>Caregivers</span>
+          </a>
+          <a href="./dashboard.html" class="sidebar-link">
+            <span class="icon">📊</span>
+            <span>Progress Reports</span>
+          </a>
+        </nav>
+      </aside>
+
+      <!-- Main Content Area -->
+      <main class="col-12 col-md-9 col-lg-10 main-page">
+        <div class="page-header">
+          <h1>Therapists</h1>
+        </div>
+
+        <div id="therapistAlert" class="alert alert-success mb-3" hidden></div>
+
+        <!-- Add Therapist Form Card -->
+        <div class="content-box">
+          <form id="addTherapistForm" autocomplete="off">
+            <div class="therapist-form-grid">
+              <div>
+                <input type="text" id="tName" class="form-control" placeholder="Name" required>
+              </div>
+
+              <div>
+                <input type="text" id="tSpecialization" class="form-control" placeholder="Specialization" list="specializationList" required>
+                <datalist id="specializationList">
+                  <option value="Physical Therapy"></option>
+                  <option value="Occupational Therapy"></option>
+                  <option value="Speech Therapy"></option>
+                  <option value="Sensory Integration"></option>
+                  <option value="Behavioral Therapy"></option>
+                  <option value="Aquatic Therapy"></option>
+                </datalist>
+              </div>
+
+              <div>
+                <input type="tel" id="tContact" class="form-control" placeholder="Contact" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required>
+              </div>
+            </div>
+
+            <button type="submit" id="btnAddTherapist" class="btn-add-therapist">
+              + Add
+            </button>
+          </form>
+        </div>
+
+        <!-- Therapists Table Card -->
+        <div class="content-box">
+          <div class="table-wrap">
+            <table class="table mb-0">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Specialization</th>
+                  <th>Contact</th>
+                  <th class="sticky-action">Action</th>
+                </tr>
+              </thead>
+              <tbody id="therapistsTableBody">
+                <tr>
+                  <td colspan="4" class="text-center text-muted py-4">Loading therapists...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <script src="./js/api.js"></script>
+  <script src="./js/therapists.js"></script>
+</body>
+</html>
