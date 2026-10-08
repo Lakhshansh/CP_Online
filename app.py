@@ -4315,31 +4315,41 @@ def api_delete_patient(patient_id=None):
 # ==========================================
 # API: DOCTORS
 # ==========================================
+def _ensure_doctor_gender_column():
+    try:
+        query("ALTER TABLE doctors ADD COLUMN gender VARCHAR(20) NULL DEFAULT 'Other'")
+    except Exception:
+        pass
+
 @app.route('/api/doctors', methods=['GET', 'POST', 'OPTIONS'])
 def api_doctors():
     if request.method == 'OPTIONS':
         return make_response('', 204)
+
+    _ensure_doctor_gender_column()
 
     if request.method == 'GET':
         try:
             user_id = request.args.get('user_id')
             role = request.args.get('role')
 
+            has_gender = True
+            try:
+                query("SELECT gender FROM doctors LIMIT 1")
+            except Exception:
+                has_gender = False
+
+            cols = "doctor_id, name, gender, specialization, contact, email, otp_verified, user_id" if has_gender else "doctor_id, name, specialization, contact, email, otp_verified, user_id"
+
             if user_id and str(role).lower() != 'admin':
-                rows = query("""
-                    SELECT doctor_id, name, specialization, contact, email,
-                           otp_verified, user_id
-                    FROM doctors
-                    WHERE user_id=%s
-                    ORDER BY doctor_id DESC
-                """, (user_id,))
+                rows = query(f"SELECT {cols} FROM doctors WHERE user_id=%s ORDER BY doctor_id DESC", (user_id,))
             else:
-                rows = query("""
-                    SELECT doctor_id, name, specialization, contact, email,
-                           otp_verified, user_id
-                    FROM doctors
-                    ORDER BY doctor_id DESC
-                """)
+                rows = query(f"SELECT {cols} FROM doctors ORDER BY doctor_id DESC")
+
+            for r in (rows or []):
+                if 'gender' not in r or not r['gender']:
+                    r['gender'] = 'Other'
+
             return jsonify({'success': True, 'doctors': rows or []})
         except Exception as e:
             return jsonify({'success': False, 'message': str(e)}), 500
@@ -4347,6 +4357,7 @@ def api_doctors():
     # POST - Direct Add (or after OTP)
     data = request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
+    gender = str(data.get('gender', 'Other')).strip() or 'Other'
     specialization = str(data.get('specialization', '')).strip()
     contact = str(data.get('contact', '')).strip()
     email = str(data.get('email', '')).strip().lower()
@@ -4363,10 +4374,16 @@ def api_doctors():
         return jsonify({'success': False, 'message': 'Doctor email is required.'}), 400
 
     try:
-        query("""
-            INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (name, specialization, contact, email, otp_verified, user_id))
+        try:
+            query("""
+                INSERT INTO doctors (name, gender, specialization, contact, email, otp_verified, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (name, gender, specialization, contact, email, otp_verified, user_id))
+        except Exception:
+            query("""
+                INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (name, specialization, contact, email, otp_verified, user_id))
         return jsonify({'success': True, 'message': 'Doctor added successfully!'}), 201
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500
@@ -4379,6 +4396,7 @@ def api_send_doctor_otp():
 
     data = request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
+    gender = str(data.get('gender', 'Other')).strip() or 'Other'
     specialization = str(data.get('specialization', '')).strip()
     contact = str(data.get('contact', '')).strip()
     email = str(data.get('email', '')).strip().lower()
@@ -4403,6 +4421,7 @@ def api_send_doctor_otp():
     s = get_reset_serializer()
     doctor_token = s.dumps({
         'name': name,
+        'gender': gender,
         'specialization': specialization,
         'contact': contact,
         'email': email,
@@ -4450,16 +4469,25 @@ def api_verify_doctor_otp():
         return jsonify({'success': False, 'message': 'Invalid OTP. Please check and try again.'}), 400
 
     name = payload.get('name')
+    gender = payload.get('gender') or 'Other'
     specialization = payload.get('specialization')
     contact = payload.get('contact')
     email = payload.get('email')
     user_id = payload.get('user_id')
 
+    _ensure_doctor_gender_column()
+
     try:
-        query("""
-            INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
-            VALUES (%s, %s, %s, %s, 1, %s)
-        """, (name, specialization, contact, email, user_id))
+        try:
+            query("""
+                INSERT INTO doctors (name, gender, specialization, contact, email, otp_verified, user_id)
+                VALUES (%s, %s, %s, %s, %s, 1, %s)
+            """, (name, gender, specialization, contact, email, user_id))
+        except Exception:
+            query("""
+                INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
+                VALUES (%s, %s, %s, %s, 1, %s)
+            """, (name, specialization, contact, email, user_id))
         return jsonify({'success': True, 'message': f'Doctor {name} added successfully!'}), 201
     except Exception as e:
         return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500

@@ -202,8 +202,8 @@
     /* Form Grid */
     .doctor-form-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 14px;
     }
     .doctor-form-grid .form-control,
     .doctor-form-grid .form-select {
@@ -318,9 +318,12 @@
     }
 
     @media (max-width: 1200px) {
+      .doctor-form-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 900px) {
       .doctor-form-grid { grid-template-columns: repeat(2, 1fr); }
     }
-    @media (max-width: 768px) {
+    @media (max-width: 600px) {
       .doctor-form-grid { grid-template-columns: 1fr; }
       .sidebar { min-height: auto; border-right: none; border-bottom: 1px solid #e9ecef; }
     }
@@ -432,6 +435,16 @@
               </div>
 
               <div>
+                <label class="form-label fw-semibold text-secondary small">Gender</label>
+                <select id="docGender" class="form-select" required>
+                  <option value="" disabled selected>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
                 <label class="form-label fw-semibold text-secondary small">Specialization</label>
                 <select id="docSpecialization" class="form-select" required>
                   <option value="" disabled selected>Select Specialization</option>
@@ -472,6 +485,7 @@
               <thead>
                 <tr>
                   <th>Name</th>
+                  <th>Gender</th>
                   <th>Specialization</th>
                   <th>Contact</th>
                   <th>Email</th>
@@ -481,7 +495,7 @@
               </thead>
               <tbody id="doctorsTableBody">
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">Loading doctors...</td>
+                  <td colspan="7" class="text-center text-muted py-4">Loading doctors...</td>
                 </tr>
               </tbody>
             </table>

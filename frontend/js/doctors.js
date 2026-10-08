@@ -51,12 +51,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       e.preventDefault();
 
       const name = document.getElementById("docName").value.trim();
+      const gender = document.getElementById("docGender").value;
       const specialization = document.getElementById("docSpecialization").value;
       const contact = document.getElementById("docContact").value.trim();
       const email = document.getElementById("docEmail").value.trim();
 
-      if (!name || !specialization || !contact || !email) {
-        showPageAlert("Please fill in all doctor details.", "danger");
+      if (!name || !gender || !specialization || !contact || !email) {
+        showPageAlert("Please fill in all doctor details including gender.", "danger");
         return;
       }
 
@@ -65,7 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      pendingDoctorData = { name, specialization, contact, email, user_id: user.user_id };
+      pendingDoctorData = { name, gender, specialization, contact, email, user_id: user.user_id };
 
       sendBtn.disabled = true;
       sendBtn.innerHTML = `<span>⏳</span> Sending OTP...`;
@@ -139,6 +140,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         // Clear form
         document.getElementById("docName").value = "";
+        document.getElementById("docGender").value = "";
         document.getElementById("docSpecialization").value = "";
         document.getElementById("docContact").value = "";
         document.getElementById("docEmail").value = "";
@@ -216,13 +218,14 @@ async function loadDoctors() {
     const doctors = (res && res.doctors) ? res.doctors : [];
 
     if (doctors.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No doctor records found.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4">No doctor records found.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = doctors.map(d => `
       <tr>
         <td><strong>${escapeHtml(d.name || '-')}</strong></td>
+        <td><span class="badge bg-light text-dark border">${escapeHtml(d.gender || '-')}</span></td>
         <td>${escapeHtml(d.specialization || '-')}</td>
         <td>${escapeHtml(d.contact || '-')}</td>
         <td>${escapeHtml(d.email || '-')}</td>
