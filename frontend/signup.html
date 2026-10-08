@@ -5,6 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Create Account - Multi Therapy Management System</title>
   <link rel="stylesheet" href="./css/style.css">
+  <style>
+    .login-card {
+      max-width: 520px;
+      margin: 30px auto;
+    }
+  </style>
 </head>
 <body>
   <nav class="mt-navbar">
@@ -27,56 +33,96 @@
       <h2>Create Account</h2>
       <p class="text-muted">Multi Therapy Management System</p>
 
-      <form id="signupForm">
+      <form id="signupForm" enctype="multipart/form-data">
+        <!-- HOSPITAL NAME -->
         <input class="form-control mb-3" name="hospital_name" type="text"
                placeholder="Hospital Name" required>
 
+        <!-- 10 DIGIT MOBILE NUMBER -->
         <input class="form-control mb-3" name="phone" type="tel"
                placeholder="10 Digit Mobile Number" maxlength="10"
-               pattern="[0-9]{10}" inputmode="numeric" required>
+               pattern="[0-9]{10}" inputmode="numeric" title="Enter exactly 10 digits" required>
 
+        <!-- USERNAME -->
         <input class="form-control mb-3" name="username" type="text"
                placeholder="Username" autocomplete="username" required>
 
+        <!-- EMAIL -->
         <input class="form-control mb-3" name="email" type="email"
                placeholder="Email Address" autocomplete="email" required>
 
+        <!-- DOCTOR NAME -->
         <input class="form-control mb-3" name="doctor_name" type="text"
                placeholder="Doctor Name" required>
 
+        <!-- DOCTOR SPECIALIZATION -->
         <select class="form-control mb-3" name="doctor_specialization" required>
           <option value="">Doctor Specialization</option>
-          <option>Neurologist</option>
-          <option>Pediatrician</option>
-          <option>Orthopedic</option>
-          <option>Physiotherapy</option>
-          <option>Occupational Therapy</option>
-          <option>Speech Therapy</option>
-          <option>Behaviour Therapy</option>
-          <option>Rehabilitation Specialist</option>
-          <option>Other</option>
+          <option value="Neurologist">Neurologist</option>
+          <option value="Pediatrician">Pediatrician</option>
+          <option value="Orthopedic">Orthopedic</option>
+          <option value="Physiotherapy">Physiotherapy</option>
+          <option value="Occupational Therapy">Occupational Therapy</option>
+          <option value="Speech Therapy">Speech Therapy</option>
+          <option value="Behaviour Therapy">Behaviour Therapy</option>
+          <option value="Rehabilitation Specialist">Rehabilitation Specialist</option>
+          <option value="Other">Other</option>
         </select>
 
+        <!-- UPLOAD DOCTOR DOCUMENT (MANDATORY) -->
         <div class="mb-3 text-start">
-          <label for="document_file" class="form-label fw-bold">
-            📄 Upload Doctor Document / Certificate
+          <label for="document_file" class="form-label fw-bold" style="font-size: 14px; color: #1e293b;">
+            📄 Upload Doctor Document / Certificate <span style="color: #dc3545;">*</span>
           </label>
           <input id="document_file" class="form-control" type="file"
                  name="document_file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required>
+          <small class="text-muted d-block mt-1" style="font-size: 12.5px; line-height: 1.4;">
+            Medical license or degree certificate (PDF, DOC, DOCX, JPG, JPEG or PNG • Max 5 MB) <span style="color: #dc3545; font-weight: 600;">*Required</span>
+          </small>
         </div>
 
-        <input class="form-control mb-3" name="password" type="password"
-               placeholder="Password" autocomplete="new-password" required>
-        <input class="form-control mb-3" name="confirm_password" type="password"
-               placeholder="Confirm Password" autocomplete="new-password" required>
+        <!-- PASSWORD -->
+        <div class="password-wrapper mb-3">
+          <input id="signupPassword" class="form-control" type="password" name="password"
+                 placeholder="Password (min 6 characters)" minlength="6" autocomplete="new-password" required>
+          <button type="button" id="toggleSignupPassword" class="password-toggle"
+                  aria-label="Show password" title="Show password">👁️</button>
+        </div>
 
-        <div id="signupMessage" class="alert" hidden></div>
-        <button type="submit" class="btn btn-primary w-100">Create Account</button>
+        <!-- CONFIRM PASSWORD -->
+        <div class="password-wrapper mb-3">
+          <input id="signupConfirm" class="form-control" type="password" name="confirm_password"
+                 placeholder="Confirm Password" minlength="6" autocomplete="new-password" required>
+          <button type="button" id="toggleSignupConfirm" class="password-toggle"
+                  aria-label="Show confirm password" title="Show confirm password">👁️</button>
+        </div>
+
+        <!-- CAPTCHA -->
+        <div class="captcha-section mb-3">
+          <label class="captcha-label fw-bold" style="font-size: 14px; color: #1e293b;">🔐 Security Verification</label>
+          <div class="captcha-box">
+            <div id="captchaText" class="captcha-image" aria-live="polite">Loading...</div>
+            <button type="button" id="refreshCaptcha" class="captcha-refresh"
+                    title="Refresh CAPTCHA" aria-label="Refresh CAPTCHA">↻</button>
+          </div>
+          <input id="captchaInput" class="form-control mt-2" type="text"
+                 placeholder="Enter CAPTCHA code" autocomplete="off"
+                 maxlength="5" required>
+        </div>
+
+        <div id="signupMessage" class="alert mb-3" hidden></div>
+
+        <!-- CREATE ACCOUNT -->
+        <button type="submit" class="btn btn-success w-100" id="signupSubmitBtn" style="font-weight: 700;">
+          Create Account
+        </button>
       </form>
 
-      <a href="./index.html" class="btn btn-outline-primary w-100 mt-2">Back to Login</a>
+      <!-- BACK TO LOGIN -->
+      <a href="./index.html" class="btn btn-outline-primary w-100 mt-2">← Back to Login</a>
     </div>
   </main>
+
   <script src="./js/api.js"></script>
   <script src="./js/signup.js"></script>
 </body>

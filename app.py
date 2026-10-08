@@ -3804,7 +3804,7 @@ def api_signup():
 
     existing = query(
         """
-        SELECT user_id
+        SELECT user_id, username, email, phone
         FROM users
         WHERE username=%s OR email=%s OR phone=%s
         LIMIT 1
@@ -3814,32 +3814,95 @@ def api_signup():
     )
 
     if existing:
+        if existing.get('username') == username:
+            msg = "Username already exists!"
+        elif existing.get('email') == email:
+            msg = "Email already exists!"
+        else:
+            msg = "Mobile number already exists!"
         return jsonify({
             "success": False,
-            "message": "Username, email, or phone number already exists."
+            "message": msg
         }), 409
 
-    # Save signup information temporarily in the session.
-    # The final INSERT should occur after your existing OTP
-    # verification succeeds.
-    session["api_signup"] = {
-        "hospital_name": hospital_name,
-        "phone": phone,
-        "username": username,
-        "email": email,
-        "doctor_name": doctor_name,
-        "doctor_specialization": doctor_specialization,
-        "password_hash": generate_password_hash(password)
-    }
+    saved_doc_filename = None
+    doc_file = request.files.get('document_file')
+    if doc_file and doc_file.filename:
+        if allowed_doc_file(doc_file.filename):
+            ext = doc_file.filename.rsplit('.', 1)[1].lower()
+            saved_doc_filename = secure_filename(
+                f"doc_{int(time.time())}_{random.randint(1000, 9999)}.{ext}"
+            )
+            os.makedirs(DOCUMENT_UPLOAD_FOLDER, exist_ok=True)
+            doc_file.save(
+                os.path.join(DOCUMENT_UPLOAD_FOLDER, saved_doc_filename)
+            )
 
+    password_hash = generate_password_hash(password)
+    con = db()
+    new_user_id = None
+    try:
+        with con.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO users
+                (
+                    hospital_name,
+                    phone,
+                    username,
+                    email,
+                    doctor_name,
+                    doctor_specialization,
+                    password,
+                    role,
+                    document_file
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (
+                    hospital_name,
+                    phone,
+                    username,
+                    email,
+                    doctor_name,
+                    doctor_specialization,
+                    password_hash,
+                    "Admin",
+                    saved_doc_filename
+                )
+            )
+            new_user_id = cur.lastrowid
+
+            if new_user_id and doctor_name:
+                cur.execute(
+                    """
+                    INSERT INTO doctors (name, specialization, contact, email, user_id)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (
+                        doctor_name,
+                        doctor_specialization,
+                        phone,
+                        email,
+                        new_user_id
+                    )
+                )
+            con.commit()
+    except Exception as e:
+        con.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Database error creating account: {str(e)}"
+        }), 500
+    finally:
+        con.close()
+
+    new_user = query("SELECT * FROM users WHERE user_id=%s", (new_user_id,), one=True)
     return jsonify({
         "success": True,
-        "requires_otp": True,
-        "message": (
-            "Signup details accepted. "
-            "Use the existing OTP verification flow to complete registration."
-        )
-    }), 200
+        "message": "Account created successfully! Redirecting to login...",
+        "user": _api_user_payload(new_user)
+    }), 201
 
 
 # =========================================================
