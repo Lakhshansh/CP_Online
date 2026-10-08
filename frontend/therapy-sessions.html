@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Doctors - Multi Therapy Management System</title>
+  <title>Therapy Sessions - Multi Therapy Management System</title>
   <link rel="icon" href="./images/logo.png" type="image/png">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="./css/style.css">
@@ -200,50 +200,43 @@
     }
 
     /* Form Grid */
-    .doctor-form-grid {
+    .session-form-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 16px;
+      grid-template-columns: 2fr 2fr 2fr 1.5fr 1fr;
+      gap: 14px;
     }
-    .doctor-form-grid .form-control,
-    .doctor-form-grid .form-select {
+    .session-form-grid .form-control,
+    .session-form-grid .form-select,
+    .session-notes-box {
       border: 1px solid #cbd5e1;
       border-radius: 8px;
       padding: 10px 14px;
       font-size: 14px;
-      height: 44px;
       color: #1e293b;
     }
-    .doctor-form-grid .form-control:focus,
-    .doctor-form-grid .form-select:focus {
+    .session-form-grid .form-control:focus,
+    .session-form-grid .form-select:focus,
+    .session-notes-box:focus {
       border-color: #0d6efd;
       box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
     }
-    .btn-send-otp {
+    .btn-add-session {
       background: #0d6efd;
       color: #ffffff;
       border: none;
       border-radius: 8px;
-      padding: 12px 24px;
+      padding: 9px 24px;
       font-weight: 600;
-      font-size: 15px;
-      width: 100%;
-      margin-top: 16px;
+      font-size: 14px;
+      margin-top: 14px;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      transition: all 0.2s;
+      gap: 6px;
+      transition: background 0.2s;
     }
-    .btn-send-otp:hover {
+    .btn-add-session:hover {
       background: #0b5ed7;
-      box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25);
-    }
-    .form-note {
-      font-size: 13px;
-      color: #64748b;
-      margin-top: 10px;
     }
 
     /* Table */
@@ -280,27 +273,6 @@
     thead th.sticky-action {
       background: #f1f5f9 !important;
     }
-    .verified-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      background: #198754;
-      color: #ffffff;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .not-verified-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 12px;
-      border-radius: 20px;
-      background: #ffc107;
-      color: #000000;
-      font-size: 12px;
-      font-weight: 600;
-    }
     .btn-delete-outline {
       border: 1px solid #dc3545;
       background: #ffffff;
@@ -318,10 +290,10 @@
     }
 
     @media (max-width: 1200px) {
-      .doctor-form-grid { grid-template-columns: repeat(2, 1fr); }
+      .session-form-grid { grid-template-columns: repeat(2, 1fr); }
     }
     @media (max-width: 768px) {
-      .doctor-form-grid { grid-template-columns: 1fr; }
+      .session-form-grid { grid-template-columns: 1fr; }
       .sidebar { min-height: auto; border-right: none; border-bottom: 1px solid #e9ecef; }
     }
   </style>
@@ -379,7 +351,7 @@
             <span class="icon">👥</span>
             <span>Patients</span>
           </a>
-          <a href="./doctors.html" class="sidebar-link active">
+          <a href="./doctors.html" class="sidebar-link">
             <span class="icon">👨‍⚕️</span>
             <span>Doctors</span>
           </a>
@@ -391,7 +363,7 @@
             <span class="icon">📅</span>
             <span>Appointments</span>
           </a>
-          <a href="./therapy-sessions.html" class="sidebar-link">
+          <a href="./therapy-sessions.html" class="sidebar-link active">
             <span class="icon">💪</span>
             <span>Therapy Sessions</span>
           </a>
@@ -417,71 +389,76 @@
       <!-- Main Content Area -->
       <main class="col-12 col-md-9 col-lg-10 main-page">
         <div class="page-header">
-          <h1>Doctors</h1>
+          <h1>💪 Therapy Sessions</h1>
         </div>
 
-        <div id="doctorAlert" class="alert alert-success mb-3" hidden></div>
+        <div id="sessionAlert" class="alert alert-success mb-3" hidden></div>
 
-        <!-- Add Doctor Form Card -->
+        <!-- Add Session Form Card -->
         <div class="content-box">
-          <form id="addDoctorForm" autocomplete="off">
-            <div class="doctor-form-grid">
+          <form id="addSessionForm" autocomplete="off">
+            <div class="session-form-grid">
               <div>
-                <label class="form-label fw-semibold text-secondary small">Doctor Name</label>
-                <input type="text" id="docName" class="form-control" placeholder="Doctor Name (e.g. Dr Priya Sharma)" required>
-              </div>
-
-              <div>
-                <label class="form-label fw-semibold text-secondary small">Specialization</label>
-                <select id="docSpecialization" class="form-select" required>
-                  <option value="" disabled selected>Select Specialization</option>
-                  <option value="Physical Therapy">Physical Therapy</option>
-                  <option value="Occupational Therapy">Occupational Therapy</option>
-                  <option value="Speech Therapy">Speech Therapy</option>
-                  <option value="Pediatric Neurologist">Pediatric Neurologist</option>
-                  <option value="Orthopedic Specialist">Orthopedic Specialist</option>
-                  <option value="Neurologist">Neurologist</option>
-                  <option value="Other">Other</option>
+                <label class="form-label small fw-semibold text-secondary">Patient</label>
+                <select id="sPatient" class="form-select" required>
+                  <option value="" disabled selected>Select Patient</option>
                 </select>
               </div>
 
               <div>
-                <label class="form-label fw-semibold text-secondary small">Contact</label>
-                <input type="tel" id="docContact" class="form-control" placeholder="10-digit Contact" maxlength="10" pattern="[0-9]{10}" inputmode="numeric" required>
+                <label class="form-label small fw-semibold text-secondary">Therapist</label>
+                <select id="sTherapist" class="form-select" required>
+                  <option value="" disabled selected>Select Therapist</option>
+                </select>
               </div>
 
               <div>
-                <label class="form-label fw-semibold text-secondary small">Doctor Email</label>
-                <input type="email" id="docEmail" class="form-control" placeholder="doctor@example.com" required>
+                <label class="form-label small fw-semibold text-secondary">Exercise</label>
+                <select id="sExercise" class="form-select" required>
+                  <option value="" disabled selected>Select Exercise</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="form-label small fw-semibold text-secondary">Date</label>
+                <input type="date" id="sDate" class="form-control" required>
+              </div>
+
+              <div>
+                <label class="form-label small fw-semibold text-secondary">Min</label>
+                <input type="number" id="sDuration" class="form-control" placeholder="Min" min="1" required>
               </div>
             </div>
 
-            <button type="submit" id="btnSendDoctorOtp" class="btn-send-otp">
-              <span>📧</span> Send OTP &amp; Add Doctor
-            </button>
-            <div class="form-note">
-              Doctor details are saved only after email OTP verification. OTP is valid for 10 minutes.
+            <div class="mt-3">
+              <label class="form-label small fw-semibold text-secondary">Session Notes</label>
+              <textarea id="sNotes" class="form-control session-notes-box" placeholder="Enter session notes..." rows="2" required></textarea>
             </div>
+
+            <button type="submit" id="btnAddSession" class="btn-add-session">
+              + Add Session
+            </button>
           </form>
         </div>
 
-        <!-- Doctors Table Card -->
+        <!-- Sessions Table Card -->
         <div class="content-box">
           <div class="table-wrap">
             <table class="table mb-0">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>Specialization</th>
-                  <th>Contact</th>
-                  <th>Email</th>
-                  <th>Email Verified</th>
+                  <th>Date</th>
+                  <th>Patient</th>
+                  <th>Therapist</th>
+                  <th>Exercise</th>
+                  <th>Duration</th>
+                  <th>Notes</th>
                   <th class="sticky-action">Action</th>
                 </tr>
               </thead>
-              <tbody id="doctorsTableBody">
+              <tbody id="sessionsTableBody">
                 <tr>
-                  <td colspan="6" class="text-center text-muted py-4">Loading doctors...</td>
+                  <td colspan="7" class="text-center text-muted py-4">Loading therapy sessions...</td>
                 </tr>
               </tbody>
             </table>
@@ -492,47 +469,7 @@
     </div>
   </div>
 
-  <!-- OTP Verification Modal -->
-  <div class="modal fade" id="doctorOtpModal" tabindex="-1" aria-labelledby="doctorOtpModalLabel" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content border-0 shadow">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title fw-bold" id="doctorOtpModalLabel">🔐 Verify Doctor Email OTP</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body p-4">
-          <p class="text-secondary mb-3">
-            A 6-digit verification code has been sent to: <br>
-            <strong id="modalTargetEmail" class="text-primary fs-6"></strong>
-          </p>
-
-          <div id="modalNoticeAlert" class="alert alert-info py-2 small mb-3" hidden></div>
-          <div id="modalErrorAlert" class="alert alert-danger py-2 small mb-3" hidden></div>
-
-          <div class="mb-3">
-            <label class="form-label fw-semibold">Enter 6-Digit OTP Code</label>
-            <input type="text" id="doctorOtpInput" class="form-control form-control-lg text-center letter-spacing-2 fw-bold" placeholder="• • • • • •" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
-          </div>
-
-          <div class="d-flex justify-content-between align-items-center mt-3">
-            <button type="button" id="btnResendDoctorOtp" class="btn btn-sm btn-outline-secondary">
-              🔄 Resend OTP
-            </button>
-            <span class="small text-muted">Expires in 10 minutes</span>
-          </div>
-        </div>
-        <div class="modal-footer bg-light">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" id="btnVerifyDoctorOtp" class="btn btn-primary px-4 fw-semibold">
-            ✓ Verify &amp; Add Doctor
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="./js/api.js"></script>
-  <script src="./js/doctors.js"></script>
+  <script src="./js/therapy-sessions.js"></script>
 </body>
 </html>

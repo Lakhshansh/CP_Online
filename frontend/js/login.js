@@ -52,6 +52,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       showMessage("loginMessage", data.message || "Login successful.", "success");
+      if (data.user) {
+        localStorage.setItem("currentUser", JSON.stringify(data.user));
+      }
       window.location.href = "./dashboard.html";
     } catch (error) {
       showMessage("loginMessage", error.message);
