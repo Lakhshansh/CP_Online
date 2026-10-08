@@ -17,6 +17,8 @@ function generateCaptcha() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Clear any existing session so new login starts clean
+  localStorage.removeItem("currentUser");
   generateCaptcha();
 
   document.getElementById("refreshCaptcha").addEventListener("click", generateCaptcha);

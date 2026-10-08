@@ -4240,34 +4240,66 @@ def api_dashboard():
     if request.method == 'OPTIONS':
         return make_response('', 204)
     data = request.get_json(silent=True) or {}
-    user_id = request.args.get('user_id') or data.get('user_id')
+    user_id = request.args.get('user_id') or data.get('user_id') or session.get('user_id')
     role = request.args.get('role') or data.get('role')
 
     try:
-        is_admin = (not user_id) or (str(role).lower() == 'admin')
-        stats = {
-            'patients': query('SELECT COUNT(*) c FROM patients', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM patients WHERE user_id=%s', (user_id,), one=True)['c'],
-            'doctors': query('SELECT COUNT(*) c FROM doctors', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM doctors WHERE user_id=%s', (user_id,), one=True)['c'],
-            'therapists': query('SELECT COUNT(*) c FROM therapists', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM therapists WHERE user_id=%s', (user_id,), one=True)['c'],
-            'appointments': query('SELECT COUNT(*) c FROM appointments', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM appointments WHERE user_id=%s', (user_id,), one=True)['c'],
-            'sessions': query('SELECT COUNT(*) c FROM therapy_sessions', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM therapy_sessions WHERE user_id=%s', (user_id,), one=True)['c'],
-            'reports': query('SELECT COUNT(*) c FROM progress_reports', one=True)['c'] if is_admin else query('SELECT COUNT(*) c FROM progress_reports WHERE user_id=%s', (user_id,), one=True)['c'],
-            'assignments': query('SELECT COUNT(*) c FROM therapist_exercise_assignments', one=True)['c'] if (table_exists('therapist_exercise_assignments') and is_admin) else (query('SELECT COUNT(*) c FROM therapist_exercise_assignments WHERE user_id=%s', (user_id,), one=True)['c'] if table_exists('therapist_exercise_assignments') else 0)
-        }
+        if user_id:
+            if str(user_id) == "1":
+                cond = "(user_id=%s OR user_id IS NULL)"
+                cond_a = "(a.user_id=%s OR a.user_id IS NULL)"
+            else:
+                cond = "user_id=%s"
+                cond_a = "a.user_id=%s"
 
-        recent = query('''
-            SELECT
-                a.appointment_date,
-                a.appointment_time,
-                a.status,
-                p.name AS patient_name,
-                d.name AS doctor_name
-            FROM appointments a
-            LEFT JOIN patients p ON a.patient_id = p.patient_id
-            LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
-            ORDER BY a.appointment_date DESC, a.appointment_time DESC
-            LIMIT 10
-        ''') or []
+            stats = {
+                'patients': query(f'SELECT COUNT(*) c FROM patients WHERE {cond}', (user_id,), one=True)['c'],
+                'doctors': query(f'SELECT COUNT(*) c FROM doctors WHERE {cond}', (user_id,), one=True)['c'],
+                'therapists': query(f'SELECT COUNT(*) c FROM therapists WHERE {cond}', (user_id,), one=True)['c'],
+                'appointments': query(f'SELECT COUNT(*) c FROM appointments WHERE {cond}', (user_id,), one=True)['c'],
+                'sessions': query(f'SELECT COUNT(*) c FROM therapy_sessions WHERE {cond}', (user_id,), one=True)['c'],
+                'reports': query(f'SELECT COUNT(*) c FROM progress_reports WHERE {cond}', (user_id,), one=True)['c'],
+                'assignments': query(f'SELECT COUNT(*) c FROM therapist_exercise_assignments WHERE {cond}', (user_id,), one=True)['c'] if table_exists('therapist_exercise_assignments') else 0
+            }
+
+            recent = query(f'''
+                SELECT
+                    a.appointment_date,
+                    a.appointment_time,
+                    a.status,
+                    p.name AS patient_name,
+                    d.name AS doctor_name
+                FROM appointments a
+                LEFT JOIN patients p ON a.patient_id = p.patient_id
+                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
+                WHERE {cond_a}
+                ORDER BY a.appointment_date DESC, a.appointment_time DESC
+                LIMIT 10
+            ''', (user_id,)) or []
+        else:
+            stats = {
+                'patients': query('SELECT COUNT(*) c FROM patients', one=True)['c'],
+                'doctors': query('SELECT COUNT(*) c FROM doctors', one=True)['c'],
+                'therapists': query('SELECT COUNT(*) c FROM therapists', one=True)['c'],
+                'appointments': query('SELECT COUNT(*) c FROM appointments', one=True)['c'],
+                'sessions': query('SELECT COUNT(*) c FROM therapy_sessions', one=True)['c'],
+                'reports': query('SELECT COUNT(*) c FROM progress_reports', one=True)['c'],
+                'assignments': query('SELECT COUNT(*) c FROM therapist_exercise_assignments', one=True)['c'] if table_exists('therapist_exercise_assignments') else 0
+            }
+
+            recent = query('''
+                SELECT
+                    a.appointment_date,
+                    a.appointment_time,
+                    a.status,
+                    p.name AS patient_name,
+                    d.name AS doctor_name
+                FROM appointments a
+                LEFT JOIN patients p ON a.patient_id = p.patient_id
+                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
+                ORDER BY a.appointment_date DESC, a.appointment_time DESC
+                LIMIT 10
+            ''') or []
 
         for r in recent:
             if 'appointment_date' in r and r['appointment_date']:
@@ -4428,15 +4460,17 @@ def api_patients():
 
     if request.method == 'GET':
         try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            if user_id and str(role).lower() != 'admin':
-                rows = query('''
+            user_id = request.args.get('user_id') or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    cond = "(user_id=%s OR user_id IS NULL)"
+                else:
+                    cond = "user_id=%s"
+                rows = query(f'''
                     SELECT patient_id, name, age, gender, contact, email,
                            otp_verified, address, disability_details, registration_date
                     FROM patients
-                    WHERE user_id=%s
+                    WHERE {cond}
                     ORDER BY patient_id DESC
                 ''', (user_id,))
             else:
@@ -4535,8 +4569,13 @@ def api_doctors():
 
             cols = "doctor_id, name, gender, specialization, contact, email, otp_verified, user_id" if has_gender else "doctor_id, name, specialization, contact, email, otp_verified, user_id"
 
-            if user_id and str(role).lower() != 'admin':
-                rows = query(f"SELECT {cols} FROM doctors WHERE user_id=%s ORDER BY doctor_id DESC", (user_id,))
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    cond = "(user_id=%s OR user_id IS NULL)"
+                else:
+                    cond = "user_id=%s"
+                rows = query(f"SELECT {cols} FROM doctors WHERE {cond} ORDER BY doctor_id DESC", (user_id,))
             else:
                 rows = query(f"SELECT {cols} FROM doctors ORDER BY doctor_id DESC")
 
@@ -4721,11 +4760,16 @@ def api_therapists():
             user_id = request.args.get('user_id')
             role = request.args.get('role')
 
-            if user_id and str(role).lower() != 'admin':
-                rows = query("""
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    cond = "(user_id=%s OR user_id IS NULL)"
+                else:
+                    cond = "user_id=%s"
+                rows = query(f"""
                     SELECT therapist_id, name, specialization, contact, user_id
                     FROM therapists
-                    WHERE user_id=%s
+                    WHERE {cond}
                     ORDER BY therapist_id DESC
                 """, (user_id,))
             else:
@@ -4806,11 +4850,15 @@ def api_appointments():
                 LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
             """
             params = ()
-            if user_id and str(role).lower() != 'admin':
-                sql += ' WHERE a.user_id=%s ORDER BY a.appointment_date DESC, a.appointment_time DESC'
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    sql += ' WHERE (a.user_id=%s OR a.user_id IS NULL) ORDER BY a.appointment_date DESC, a.appointment_time DESC'
+                else:
+                    sql += ' WHERE a.user_id=%s ORDER BY a.appointment_date DESC, a.appointment_time DESC'
                 params = (user_id,)
             else:
-                sql += ' ORDER BY a.appointment_date DESC, a.appointment_time DESC'
+                sql += ' ORDER BY a.appointment_date DESC, a.appointment_time DESC' 
 
             rows = query(sql, params)
             for r in rows:
@@ -4885,11 +4933,15 @@ def api_therapy_sessions():
                 LEFT JOIN exercises e ON s.exercise_id = e.exercise_id
             """
             params = ()
-            if user_id and str(role).lower() != 'admin':
-                sql += ' WHERE s.user_id=%s ORDER BY s.session_date DESC, s.session_id DESC'
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    sql += ' WHERE (s.user_id=%s OR s.user_id IS NULL) ORDER BY s.session_date DESC, s.session_id DESC'
+                else:
+                    sql += ' WHERE s.user_id=%s ORDER BY s.session_date DESC, s.session_id DESC'
                 params = (user_id,)
             else:
-                sql += ' ORDER BY s.session_date DESC, s.session_id DESC'
+                sql += ' ORDER BY s.session_date DESC, s.session_id DESC' 
 
             rows = query(sql, params)
             for r in rows:
@@ -5015,11 +5067,15 @@ def api_exercise_assignments():
                 LEFT JOIN exercises e ON a.exercise_id = e.exercise_id
             """
             params = ()
-            if user_id and str(role).lower() != 'admin':
-                sql += ' WHERE a.user_id=%s ORDER BY a.assignment_id DESC'
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    sql += ' WHERE (a.user_id=%s OR a.user_id IS NULL) ORDER BY a.assignment_id DESC'
+                else:
+                    sql += ' WHERE a.user_id=%s ORDER BY a.assignment_id DESC'
                 params = (user_id,)
             else:
-                sql += ' ORDER BY a.assignment_id DESC'
+                sql += ' ORDER BY a.assignment_id DESC' 
 
             rows = query(sql, params)
             for r in rows:
@@ -5114,11 +5170,15 @@ def api_caregivers():
                 LEFT JOIN patients p ON c.patient_id = p.patient_id
             """
             params = ()
-            if user_id and str(role).lower() != 'admin':
-                sql += ' WHERE c.user_id=%s ORDER BY c.caregiver_id DESC'
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    sql += ' WHERE (c.user_id=%s OR c.user_id IS NULL) ORDER BY c.caregiver_id DESC'
+                else:
+                    sql += ' WHERE c.user_id=%s ORDER BY c.caregiver_id DESC'
                 params = (user_id,)
             else:
-                sql += ' ORDER BY c.caregiver_id DESC'
+                sql += ' ORDER BY c.caregiver_id DESC' 
 
             rows = query(sql, params)
             return jsonify({'success': True, 'caregivers': rows or []})
@@ -5185,11 +5245,15 @@ def api_progress_reports():
                 LEFT JOIN patients p ON pr.patient_id = p.patient_id
             """
             params = ()
-            if user_id and str(role).lower() != 'admin':
-                sql += ' WHERE pr.user_id=%s ORDER BY pr.report_id DESC'
+            user_id = user_id or session.get('user_id')
+            if user_id:
+                if str(user_id) == "1":
+                    sql += ' WHERE (pr.user_id=%s OR pr.user_id IS NULL) ORDER BY pr.report_id DESC'
+                else:
+                    sql += ' WHERE pr.user_id=%s ORDER BY pr.report_id DESC'
                 params = (user_id,)
             else:
-                sql += ' ORDER BY pr.report_id DESC'
+                sql += ' ORDER BY pr.report_id DESC' 
 
             rows = query(sql, params)
             for r in rows:
