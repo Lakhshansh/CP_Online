@@ -3838,7 +3838,87 @@ def api_signup():
                 os.path.join(DOCUMENT_UPLOAD_FOLDER, saved_doc_filename)
             )
 
-    password_hash = generate_password_hash(password)
+    email_otp = generate_otp()
+    pending_record = {
+        "hospital_name": hospital_name,
+        "phone": phone,
+        "username": username,
+        "email": email,
+        "doctor_name": doctor_name,
+        "doctor_specialization": doctor_specialization,
+        "password_hash": generate_password_hash(password),
+        "document_file": saved_doc_filename,
+        "otp": email_otp,
+        "expires_at": time.time() + 300
+    }
+
+    # Cross-origin resilient in-memory storage
+    if not hasattr(app, "pending_signups"):
+        app.pending_signups = {}
+    app.pending_signups[email] = pending_record
+
+    # Session storage
+    session['signup_pending'] = pending_record
+    session['email_otp'] = email_otp
+    session['otp_expires_at'] = time.time() + 300
+
+    delivered = False
+    try:
+        delivered = send_email_otp(email, email_otp)
+    except Exception as exc:
+        print("SEND SIGNUP OTP ERROR:", repr(exc))
+
+    return jsonify({
+        "success": True,
+        "requires_otp": True,
+        "email": email,
+        "message": "OTP sent to your email.",
+        "delivered": delivered,
+        "demo_otp": email_otp if not delivered else None
+    }), 200
+
+
+@app.route("/api/verify-signup-otp", methods=["POST"])
+def api_verify_signup_otp():
+    data = request.form.to_dict() if request.form else (
+        request.get_json(silent=True) or {}
+    )
+
+    email_otp = str(data.get("email_otp", "")).strip()
+    email = str(data.get("email", "")).strip().lower()
+
+    pending = None
+    if not hasattr(app, "pending_signups"):
+        app.pending_signups = {}
+
+    if email and email in app.pending_signups:
+        pending = app.pending_signups[email]
+    elif 'signup_pending' in session:
+        pending = session['signup_pending']
+
+    if not pending:
+        return jsonify({
+            "success": False,
+            "message": "Signup session expired or not found. Please sign up again."
+        }), 400
+
+    if time.time() > pending.get("expires_at", 0):
+        if email in app.pending_signups:
+            del app.pending_signups[email]
+        session.pop('signup_pending', None)
+        return jsonify({
+            "success": False,
+            "message": "OTP has expired. Please sign up again or request a new OTP."
+        }), 400
+
+    expected_otp = pending.get("otp") or session.get('email_otp')
+    if not email_otp or email_otp != str(expected_otp):
+        return jsonify({
+            "success": False,
+            "message": "Invalid Email OTP. Please check the code and try again."
+        }), 400
+
+    password_hash = pending.get("password_hash")
     con = db()
     new_user_id = None
     try:
@@ -3860,30 +3940,30 @@ def api_signup():
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
-                    hospital_name,
-                    phone,
-                    username,
-                    email,
-                    doctor_name,
-                    doctor_specialization,
+                    pending['hospital_name'],
+                    pending['phone'],
+                    pending['username'],
+                    pending['email'],
+                    pending['doctor_name'],
+                    pending['doctor_specialization'],
                     password_hash,
                     "Admin",
-                    saved_doc_filename
+                    pending.get('document_file')
                 )
             )
             new_user_id = cur.lastrowid
 
-            if new_user_id and doctor_name:
+            if new_user_id and pending.get('doctor_name'):
                 cur.execute(
                     """
                     INSERT INTO doctors (name, specialization, contact, email, user_id)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
                     (
-                        doctor_name,
-                        doctor_specialization,
-                        phone,
-                        email,
+                        pending['doctor_name'],
+                        pending['doctor_specialization'],
+                        pending['phone'],
+                        pending['email'],
                         new_user_id
                     )
                 )
@@ -3897,12 +3977,62 @@ def api_signup():
     finally:
         con.close()
 
-    new_user = query("SELECT * FROM users WHERE user_id=%s", (new_user_id,), one=True)
+    if email in app.pending_signups:
+        del app.pending_signups[email]
+    session.pop('signup_pending', None)
+    session.pop('email_otp', None)
+    session.pop('otp_expires_at', None)
+
     return jsonify({
         "success": True,
         "message": "Account created successfully! Redirecting to login...",
-        "user": _api_user_payload(new_user)
+        "user_id": new_user_id
     }), 201
+
+
+@app.route("/api/resend-signup-otp", methods=["POST"])
+def api_resend_signup_otp():
+    data = request.form.to_dict() if request.form else (
+        request.get_json(silent=True) or {}
+    )
+    email = str(data.get("email", "")).strip().lower()
+
+    if not hasattr(app, "pending_signups"):
+        app.pending_signups = {}
+
+    pending = None
+    if email and email in app.pending_signups:
+        pending = app.pending_signups[email]
+    elif 'signup_pending' in session:
+        pending = session['signup_pending']
+        email = pending.get('email', '')
+
+    if not pending:
+        return jsonify({
+            "success": False,
+            "message": "Signup session expired. Please sign up again."
+        }), 400
+
+    new_otp = generate_otp()
+    pending['otp'] = new_otp
+    pending['expires_at'] = time.time() + 300
+    app.pending_signups[email] = pending
+
+    session['email_otp'] = new_otp
+    session['otp_expires_at'] = time.time() + 300
+
+    delivered = False
+    try:
+        delivered = send_email_otp(email, new_otp)
+    except Exception as exc:
+        print("RESEND SIGNUP OTP ERROR:", repr(exc))
+
+    return jsonify({
+        "success": True,
+        "message": "New OTP sent to your email.",
+        "delivered": delivered,
+        "demo_otp": new_otp if not delivered else None
+    }), 200
 
 
 # =========================================================

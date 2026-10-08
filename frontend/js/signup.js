@@ -111,6 +111,19 @@ document.addEventListener("DOMContentLoaded", () => {
           body: data
         });
 
+        if (result && result.requires_otp) {
+          const emailVal = result.email || data.get("email");
+          sessionStorage.setItem("signup_pending_email", emailVal);
+          if (result.demo_otp) {
+            sessionStorage.setItem("signup_demo_otp", result.demo_otp);
+          }
+          if (result.message) {
+            sessionStorage.setItem("signup_flash_message", result.message);
+          }
+          window.location.href = `./verify-signup-otp.html?email=${encodeURIComponent(emailVal)}`;
+          return;
+        }
+
         showSignupMessage(result.message || "Account created successfully! Redirecting to login...", "success");
 
         setTimeout(() => {
