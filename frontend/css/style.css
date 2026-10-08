@@ -391,6 +391,33 @@ main {
 }
 
 /* =========================================================
+   CREATE ACCOUNT (GREEN SUCCESS BUTTON)
+   ========================================================= */
+
+.btn-success,
+.login-card .btn-success {
+    background: #198754 !important;
+    border: none !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    margin-bottom: 0;
+}
+
+.btn-success:hover,
+.login-card .btn-success:hover {
+    background: #157347 !important;
+    color: #ffffff !important;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(25, 135, 84, 0.35);
+}
+
+.btn-success:active,
+.login-card .btn-success:active {
+    background: #146c43 !important;
+    transform: translateY(0);
+}
+
+/* =========================================================
    SIGN UP BUTTON (SEPARATE SPACING & OUTLINE STYLE)
    ========================================================= */
 
