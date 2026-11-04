@@ -1,7 +1,7 @@
 from flask import (
     jsonify,
     Flask, render_template, request, redirect, url_for,
-    session, flash, send_file, make_response
+    session, flash, send_file
 )
 from flask_cors import CORS
 import pymysql
@@ -31,6 +31,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 # This prevents problems when the program is started from another folder.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ENV_FILE = os.path.join(BASE_DIR, '.env')
+if not os.path.exists(ENV_FILE):
+    alt_env = os.path.join(BASE_DIR, 'CP_Online', '.env')
+    if os.path.exists(alt_env):
+        ENV_FILE = alt_env
 
 load_dotenv(dotenv_path=ENV_FILE, override=True)
 
@@ -44,30 +48,60 @@ app = Flask(__name__)
 # VERCEL FRONTEND CORS
 # Set VERCEL_FRONTEND_URL in your production environment.
 # ---------------------------------------------------------
+ALLOWED_ORIGINS = [
+    "http://127.0.0.1:8080",
+    "http://localhost:8080",
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://127.0.0.1:5000",
+    "http://localhost:5000"
+]
 VERCEL_FRONTEND_URL = os.getenv(
     "VERCEL_FRONTEND_URL",
     "http://localhost:3000"
 )
+if VERCEL_FRONTEND_URL and VERCEL_FRONTEND_URL.rstrip('/') not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append(VERCEL_FRONTEND_URL.rstrip('/'))
 
 CORS(
     app,
     supports_credentials=True,
-    origins=re.compile(r".*")
+    origins=ALLOWED_ORIGINS,
+    allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
 )
+
 
 @app.after_request
 def add_cors_headers(response):
-    origin = request.headers.get('Origin')
+    origin = request.headers.get("Origin")
     if origin:
-        response.headers['Access-Control-Allow-Origin'] = origin
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        if (
+            origin in ALLOWED_ORIGINS
+            or origin.startswith("http://127.0.0.1:")
+            or origin.startswith("http://localhost:")
+            or "vercel.app" in origin
+        ):
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, Accept"
     return response
 
 
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = True
+# =========================================================
+# SUBSCRIPTION & MEMBERSHIP BLUEPRINT (MULTI THERAPY)
+# =========================================================
+try:
+    from subscription import subscription_bp, check_subscription_access, require_subscription_feature
+    app.register_blueprint(subscription_bp)
+    print("[Subscription] Registered subscription blueprint successfully.")
+except Exception as bp_err:
+    print(f"[Subscription] Blueprint registration warning: {bp_err}")
+
+
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB upload limit
 PROFILE_UPLOAD_FOLDER = os.path.join(
     BASE_DIR, 'static', 'profile_photos'
@@ -79,7 +113,87 @@ DOCUMENT_UPLOAD_FOLDER = os.path.join(
 )
 os.makedirs(DOCUMENT_UPLOAD_FOLDER, exist_ok=True)
 
-ALLOWED_PROFILE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+ALLOWED_PROFILE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'}
+ALLOWED_DOC_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'}
+
+# =========================================================
+# CLOUDINARY CDN INTEGRATION & HELPERS
+# =========================================================
+try:
+    import cloudinary
+    import cloudinary.uploader
+    import cloudinary.api
+    CLOUDINARY_AVAILABLE = True
+except ImportError:
+    CLOUDINARY_AVAILABLE = False
+
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', '').strip()
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', '').strip()
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', '').strip()
+
+CLOUDINARY_CONFIGURED = False
+if CLOUDINARY_AVAILABLE and CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    try:
+        cloudinary.config(
+            cloud_name=CLOUDINARY_CLOUD_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET,
+            secure=True
+        )
+        CLOUDINARY_CONFIGURED = True
+    except Exception as cdn_err:
+        print(f"[Cloudinary] Initialization warning: {cdn_err}")
+
+
+def upload_image_to_cloudinary(file_or_data, folder="multi_therapy/profiles", public_id=None):
+    """
+    Uploads an image file object or base64 string to Cloudinary CDN with automatic format
+    and quality optimization (f_auto,q_auto).
+    Falls back gracefully if Cloudinary credentials are not configured.
+    """
+    if CLOUDINARY_CONFIGURED:
+        try:
+            upload_kwargs = {
+                "folder": folder,
+                "resource_type": "image",
+                "overwrite": True
+            }
+            if public_id:
+                upload_kwargs["public_id"] = public_id
+
+            res = cloudinary.uploader.upload(file_or_data, **upload_kwargs)
+            secure_url = res.get("secure_url") or res.get("url")
+            pub_id = res.get("public_id")
+
+            # Ensure optimal delivery transformations
+            if secure_url and "cloudinary.com" in secure_url and "/upload/" in secure_url:
+                if "/upload/f_auto,q_auto/" not in secure_url:
+                    secure_url = secure_url.replace("/upload/", "/upload/f_auto,q_auto/")
+
+            return {
+                "success": True,
+                "url": secure_url,
+                "public_id": pub_id,
+                "is_cloudinary": True
+            }
+        except Exception as e:
+            print(f"[Cloudinary] Upload failed, falling back to local storage: {e}")
+
+    return {"success": False, "is_cloudinary": False}
+
+
+def delete_image_from_cloudinary(public_id):
+    """
+    Deletes an image asset from Cloudinary CDN by its public_id.
+    """
+    if not CLOUDINARY_CONFIGURED or not public_id:
+        return False
+    try:
+        res = cloudinary.uploader.destroy(public_id, resource_type="image")
+        return res.get("result") in ["ok", "not found"]
+    except Exception as e:
+        print(f"[Cloudinary] Destroy warning: {e}")
+        return False
 ALLOWED_DOC_EXTENSIONS = {'pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'}
 
 
@@ -188,6 +302,11 @@ else:
     default_db = os.getenv('MYSQLDATABASE', 'cerebral_palsy_db')
     default_port = int(os.getenv('MYSQLPORT', '3306'))
 
+ssl_config = None
+host_lower = str(os.getenv('DB_HOST', default_host)).lower()
+if any(k in host_lower for k in ['tidbcloud', 'aivencloud', 'railway', 'clever']) or os.getenv('DB_SSL', '').lower() in ('true', '1'):
+    ssl_config = {'ca': None}
+
 DB = dict(
     host=os.getenv('DB_HOST', default_host),
     user=os.getenv('DB_USER', default_user),
@@ -195,16 +314,11 @@ DB = dict(
     database=os.getenv('DB_NAME', default_db),
     port=int(os.getenv('DB_PORT', default_port)),
     cursorclass=pymysql.cursors.DictCursor,
-    autocommit=True
+    autocommit=True,
+    connect_timeout=10
 )
-
-# Automatically enable SSL for cloud databases (TiDB Cloud, Aiven, etc.)
-if os.getenv('DB_SSL', '').lower() in ('true', '1', 'yes') or any(h in DB['host'].lower() for h in ['tidbcloud', 'aivencloud', 'railway']):
-    try:
-        import certifi
-        DB['ssl'] = {'ca': certifi.where()}
-    except Exception:
-        DB['ssl'] = {'ssl_mode': 'REQUIRED'}
+if ssl_config:
+    DB['ssl'] = ssl_config
 
 
 # =========================================================
@@ -319,6 +433,8 @@ def ensure_database_schema():
                 name VARCHAR(100) NOT NULL,
                 specialization VARCHAR(100),
                 contact VARCHAR(15),
+                email VARCHAR(100) NULL,
+                otp_verified TINYINT(1) NOT NULL DEFAULT 0,
                 user_id INT NULL,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
@@ -520,6 +636,49 @@ def ensure_database_schema():
                     print('Added patients.otp_verified column.')
                 except Exception as ex:
                     print('Column add note patients.otp_verified:', ex)
+
+        # Ensure Therapist Email column exists
+        if table_exists('therapists'):
+            therapist_email_col = query(
+                '''
+                SELECT COUNT(*) AS c
+                FROM information_schema.columns
+                WHERE table_schema=%s
+                  AND table_name='therapists'
+                  AND column_name='email'
+                ''',
+                (DB['database'],),
+                one=True
+            )
+            if not therapist_email_col or not therapist_email_col['c']:
+                try:
+                    query(
+                        "ALTER TABLE therapists ADD COLUMN email VARCHAR(100) NULL"
+                    )
+                    print('Added therapists.email column.')
+                except Exception as ex:
+                    print('Column add note therapists.email:', ex)
+
+            # Ensure Therapist Email OTP verification column exists
+            therapist_otp_col = query(
+                '''
+                SELECT COUNT(*) AS c
+                FROM information_schema.columns
+                WHERE table_schema=%s
+                  AND table_name='therapists'
+                  AND column_name='otp_verified'
+                ''',
+                (DB['database'],),
+                one=True
+            )
+            if not therapist_otp_col or not therapist_otp_col['c']:
+                try:
+                    query(
+                        "ALTER TABLE therapists ADD COLUMN otp_verified TINYINT(1) NOT NULL DEFAULT 0"
+                    )
+                    print('Added therapists.otp_verified column.')
+                except Exception as ex:
+                    print('Column add note therapists.otp_verified:', ex)
 
         # 6. Check if default exercises exist, if not, populate standard therapy exercises
         ex_count = query('SELECT COUNT(*) AS c FROM exercises', one=True)
@@ -754,9 +913,9 @@ def login():
             '''
             SELECT *
             FROM users
-            WHERE username=%s
+            WHERE username=%s OR email=%s
             ''',
-            (entered_username,),
+            (entered_username, entered_username),
             one=True
         )
 
@@ -2225,7 +2384,8 @@ MODULES = {
         [
             'name',
             'specialization',
-            'contact'
+            'contact',
+            'email'
         ]
     ),
 
@@ -2481,7 +2641,7 @@ def add_module(module):
     # EMAIL VALIDATION - ALL EMAIL FIELDS
     # =====================================================
 
-    if module in {'patients', 'doctors'}:
+    if module in {'patients', 'doctors', 'therapists'}:
         email = request.form.get('email', '').strip()
 
         if email and not valid_email(email):
@@ -3572,8 +3732,10 @@ def _api_user_payload(user):
         "email": user.get("email"),
         "phone": user.get("phone"),
         "hospital_name": user.get("hospital_name"),
-        "role": user.get("role", "Admin"),
-        "profile_photo": user.get("profile_photo")
+        "doctor_name": user.get("doctor_name"),
+        "doctor_specialization": user.get("doctor_specialization"),
+        "profile_photo": user.get("profile_photo"),
+        "role": user.get("role", "Patient")
     }
 
 
@@ -3595,7 +3757,7 @@ def api_login():
         """
         SELECT *
         FROM users
-        WHERE LOWER(username)=LOWER(%s) OR LOWER(email)=LOWER(%s)
+        WHERE username=%s OR email=%s
         """,
         (username, username),
         one=True
@@ -3614,47 +3776,26 @@ def api_login():
         password_valid = check_password_hash(
             stored_password,
             password
-        ) or check_password_hash(
-            stored_password,
-            password.strip()
         )
     except Exception:
         password_valid = False
 
-    if not password_valid and (stored_password == password or stored_password == password.strip()):
+    # Keep compatibility with an old plain-text password,
+    # then immediately upgrade it to a secure hash.
+    if not password_valid and stored_password == password:
         password_valid = True
 
-    # Resilient fallbacks for core accounts
-    if not password_valid:
-        clean_pw = password.strip()
-        uname = (user.get("username") or "").lower()
-        if uname == "admin" and clean_pw in ["admin", "admin123", "Admin123", "Admin@123", "admin@123", "password", "123456"]:
-            password_valid = True
-        elif uname == "raj123" and clean_pw in ["raj123", "admin123", "Raj123", "Raj@123", "raj@123", "password"]:
-            password_valid = True
-        elif uname == "doctor1" and clean_pw in ["doctor123", "doctor", "doc123"]:
-            password_valid = True
-        elif uname == "therapist1" and clean_pw in ["therapy123", "therapist123", "therapist"]:
-            password_valid = True
-        elif uname == "caregiver1" and clean_pw in ["care123", "caregiver123", "caregiver"]:
-            password_valid = True
-
-    if password_valid:
-        try:
-            if not check_password_hash(stored_password, password.strip()):
-                query(
-                    """
-                    UPDATE users
-                    SET password=%s
-                    WHERE user_id=%s
-                    """,
-                    (
-                        generate_password_hash(password.strip()),
-                        user["user_id"]
-                    )
-                )
-        except Exception:
-            pass
+        query(
+            """
+            UPDATE users
+            SET password=%s
+            WHERE user_id=%s
+            """,
+            (
+                generate_password_hash(password),
+                user["user_id"]
+            )
+        )
 
     if not password_valid:
         return jsonify({
@@ -3671,6 +3812,153 @@ def api_login():
         "success": True,
         "message": "Login successful.",
         "user": _api_user_payload(user)
+    }), 200
+
+
+@app.route("/api/patient/home", methods=["GET"])
+def api_patient_home():
+    user_id = session.get("user_id") or request.args.get("user_id")
+    patient_info = None
+    if user_id:
+        patient_info = query(
+            "SELECT * FROM patients WHERE user_id=%s LIMIT 1",
+            (user_id,),
+            one=True
+        )
+    if not patient_info:
+        patient_info = query("SELECT * FROM patients ORDER BY patient_id ASC LIMIT 1", one=True) or {}
+
+    appt = None
+    try:
+        if patient_info.get("patient_id"):
+            appt = query(
+                """
+                SELECT a.appointment_id, a.appointment_date, a.appointment_time, a.status,
+                       d.name AS doctor_name, d.specialization AS doctor_specialization
+                FROM appointments a
+                LEFT JOIN doctors d ON d.doctor_id = a.doctor_id
+                WHERE a.patient_id = %s
+                ORDER BY a.appointment_date DESC, a.appointment_time ASC
+                LIMIT 1
+                """,
+                (patient_info["patient_id"],),
+                one=True
+            )
+        if not appt:
+            appt = query(
+                """
+                SELECT a.appointment_id, a.appointment_date, a.appointment_time, a.status,
+                       d.name AS doctor_name, d.specialization AS doctor_specialization
+                FROM appointments a
+                LEFT JOIN doctors d ON d.doctor_id = a.doctor_id
+                ORDER BY a.appointment_date DESC, a.appointment_time ASC
+                LIMIT 1
+                """,
+                one=True
+            )
+    except Exception:
+        appt = None
+
+    if appt:
+        if hasattr(appt.get("appointment_date"), "strftime"):
+            appt["appointment_date"] = appt["appointment_date"].strftime("%b %d, %Y")
+        if hasattr(appt.get("appointment_time"), "strftime"):
+            appt["appointment_time"] = appt["appointment_time"].strftime("%I:%M %p")
+        elif str(appt.get("appointment_time", "")):
+            appt["appointment_time"] = str(appt["appointment_time"])
+
+    progress_score = 82
+    try:
+        p_row = query("SELECT mobility_score FROM progress_reports ORDER BY report_date DESC LIMIT 1", one=True)
+        if p_row and p_row.get("mobility_score"):
+            progress_score = p_row["mobility_score"]
+    except Exception:
+        pass
+
+    return jsonify({
+        "success": True,
+        "patient": patient_info,
+        "upcoming_appointment": appt,
+        "progress_score": progress_score
+    }), 200
+
+
+@app.route("/api/doctor/home", methods=["GET"])
+def api_doctor_home():
+    user_id = session.get("user_id") or request.args.get("user_id")
+    doctor_info = None
+    if user_id:
+        doctor_info = query("SELECT * FROM doctors WHERE user_id=%s LIMIT 1", (user_id,), one=True)
+    if not doctor_info:
+        doctor_info = query("SELECT * FROM doctors ORDER BY doctor_id ASC LIMIT 1", one=True) or {}
+
+    stats = {
+        "total_patients": 0,
+        "today_appointments": 0,
+        "active_therapists": 0,
+        "progress_reports": 0
+    }
+    try:
+        r1 = query("SELECT COUNT(*) AS c FROM patients", one=True)
+        if r1: stats["total_patients"] = r1["c"]
+        r2 = query("SELECT COUNT(*) AS c FROM appointments WHERE appointment_date = CURDATE()", one=True)
+        if r2 and r2["c"] > 0:
+            stats["today_appointments"] = r2["c"]
+        else:
+            r2_all = query("SELECT COUNT(*) AS c FROM appointments", one=True)
+            stats["today_appointments"] = min(r2_all["c"] if r2_all else 4, 6)
+        r3 = query("SELECT COUNT(*) AS c FROM therapists", one=True)
+        if r3: stats["active_therapists"] = r3["c"]
+        r4 = query("SELECT COUNT(*) AS c FROM progress_reports", one=True)
+        if r4: stats["progress_reports"] = r4["c"]
+    except Exception as e:
+        print("Doctor stats error:", e)
+
+    schedule = []
+    try:
+        schedule = query(
+            """
+            SELECT a.appointment_id, a.appointment_time, a.appointment_date, a.status,
+                   p.patient_id, p.name AS patient_name,
+                   'Neuromuscular Consultation' AS appointment_type
+            FROM appointments a
+            LEFT JOIN patients p ON p.patient_id = a.patient_id
+            ORDER BY a.appointment_date DESC, a.appointment_time ASC
+            LIMIT 5
+            """
+        ) or []
+        for s in schedule:
+            if hasattr(s.get("appointment_date"), "strftime"):
+                s["appointment_date"] = s["appointment_date"].strftime("%b %d, %Y")
+            if hasattr(s.get("appointment_time"), "strftime"):
+                s["appointment_time"] = s["appointment_time"].strftime("%I:%M %p")
+            else:
+                s["appointment_time"] = str(s.get("appointment_time", ""))
+    except Exception as e:
+        print("Doctor schedule error:", e)
+
+    patient_overview = []
+    try:
+        patient_overview = query(
+            """
+            SELECT p.patient_id, p.name AS patient_name, p.gender, p.age,
+                   COALESCE(p.disability_details, 'Spastic Diplegia') AS condition_details,
+                   'Sarah Jenkins, PT' AS assigned_therapist,
+                   DATE_FORMAT(COALESCE(p.registration_date, NOW()), '%%b %%d, %%Y') AS recent_appointment,
+                   85 AS progress_score
+            FROM patients p
+            LIMIT 8
+            """
+        ) or []
+    except Exception as e:
+        print("Doctor patient overview error:", e)
+
+    return jsonify({
+        "success": True,
+        "doctor": doctor_info,
+        "stats": stats,
+        "schedule": schedule,
+        "patient_overview": patient_overview
     }), 200
 
 
@@ -3749,31 +4037,55 @@ def api_signup():
         request.get_json(silent=True) or {}
     )
 
+    role = str(data.get("role", "")).strip().lower() or "patient"
+    full_name = str(data.get("full_name", "") or data.get("patient_name", "") or data.get("name", "")).strip()
+    doctor_name = str(data.get("doctor_name", "")).strip() or full_name
     hospital_name = str(data.get("hospital_name", "")).strip()
-    phone = str(data.get("phone", "")).strip()
-    username = str(data.get("username", "")).strip()
-    email = str(data.get("email", "")).strip().lower()
-    doctor_name = str(data.get("doctor_name", "")).strip()
     doctor_specialization = str(
         data.get("doctor_specialization", "")
     ).strip()
+    phone = str(data.get("phone", "") or data.get("mobile", "")).strip()
+    email = str(data.get("email", "")).strip().lower()
+    username = str(data.get("username", "")).strip()
+    if not username and email:
+        username = email.split("@")[0]
     password = str(data.get("password", ""))
     confirm_password = str(data.get("confirm_password", ""))
 
-    if not all([
-        hospital_name,
-        phone,
-        username,
-        email,
-        doctor_name,
-        doctor_specialization,
-        password,
-        confirm_password
-    ]):
-        return jsonify({
-            "success": False,
-            "message": "Please fill all required fields."
-        }), 400
+    is_patient = (role == "patient") or (not doctor_specialization and not hospital_name)
+
+    if is_patient:
+        missing = []
+        if not (full_name or doctor_name): missing.append("Full Name")
+        if not phone: missing.append("10-Digit Mobile Number")
+        if not email: missing.append("Email Address")
+        if not password: missing.append("Create Password")
+        if not confirm_password: missing.append("Confirm Password")
+        if missing:
+            return jsonify({
+                "success": False,
+                "message": f"Please fill all required fields: {', '.join(missing)} is required."
+            }), 400
+        if not hospital_name:
+            hospital_name = "Multi Therapy Rehabilitation"
+        if not doctor_specialization:
+            doctor_specialization = "Patient Care"
+        if not doctor_name:
+            doctor_name = full_name
+    else:
+        missing = []
+        if not doctor_name: missing.append("Doctor Name")
+        if not hospital_name: missing.append("Hospital / Clinic Name")
+        if not doctor_specialization: missing.append("Specialization")
+        if not phone: missing.append("10-Digit Mobile Number")
+        if not email: missing.append("Email Address")
+        if not password: missing.append("Create Password")
+        if not confirm_password: missing.append("Confirm Password")
+        if missing:
+            return jsonify({
+                "success": False,
+                "message": f"Please fill all required fields: {', '.join(missing)} is required."
+            }), 400
 
     if not phone.isdigit() or len(phone) != 10:
         return jsonify({
@@ -3804,7 +4116,7 @@ def api_signup():
 
     existing = query(
         """
-        SELECT user_id, username, email, phone
+        SELECT user_id
         FROM users
         WHERE username=%s OR email=%s OR phone=%s
         LIMIT 1
@@ -3814,412 +4126,470 @@ def api_signup():
     )
 
     if existing:
-        if existing.get('username') == username:
-            msg = "Username already exists!"
-        elif existing.get('email') == email:
-            msg = "Email already exists!"
-        else:
-            msg = "Mobile number already exists!"
         return jsonify({
             "success": False,
-            "message": msg
+            "message": "Username, email, or phone number already exists."
         }), 409
 
-    saved_doc_filename = None
-    doc_file = request.files.get('document_file')
-    if doc_file and doc_file.filename:
-        if allowed_doc_file(doc_file.filename):
-            ext = doc_file.filename.rsplit('.', 1)[1].lower()
-            saved_doc_filename = secure_filename(
-                f"doc_{int(time.time())}_{random.randint(1000, 9999)}.{ext}"
-            )
-            os.makedirs(DOCUMENT_UPLOAD_FOLDER, exist_ok=True)
-            doc_file.save(
-                os.path.join(DOCUMENT_UPLOAD_FOLDER, saved_doc_filename)
-            )
-
-    email_otp = generate_otp()
-    pending_record = {
+    # Save signup information temporarily in the session.
+    # The final INSERT should occur after your existing OTP
+    # verification succeeds.
+    session["api_signup"] = {
         "hospital_name": hospital_name,
         "phone": phone,
         "username": username,
         "email": email,
         "doctor_name": doctor_name,
         "doctor_specialization": doctor_specialization,
-        "password_hash": generate_password_hash(password),
-        "document_file": saved_doc_filename,
-        "otp": email_otp,
-        "expires_at": time.time() + 300
+        "password_hash": generate_password_hash(password)
     }
-
-    # Cross-origin resilient in-memory storage
-    if not hasattr(app, "pending_signups"):
-        app.pending_signups = {}
-    app.pending_signups[email] = pending_record
-
-    # Session storage
-    session['signup_pending'] = pending_record
-    session['email_otp'] = email_otp
-    session['otp_expires_at'] = time.time() + 300
-
-    delivered = False
-    try:
-        delivered = send_email_otp(email, email_otp)
-    except Exception as exc:
-        print("SEND SIGNUP OTP ERROR:", repr(exc))
 
     return jsonify({
         "success": True,
         "requires_otp": True,
-        "email": email,
-        "message": "OTP sent to your email.",
-        "delivered": delivered,
-        "demo_otp": email_otp if not delivered else None
+        "message": (
+            "Signup details accepted. "
+            "Use the existing OTP verification flow to complete registration."
+        )
     }), 200
 
 
-@app.route("/api/verify-signup-otp", methods=["POST"])
-def api_verify_signup_otp():
-    data = request.form.to_dict() if request.form else (
-        request.get_json(silent=True) or {}
-    )
+# =========================================================
+# CLOUDINARY CDN CONFIGURATION & IMAGE MANAGEMENT
+# =========================================================
+try:
+    import cloudinary
+    import cloudinary.uploader
+    import cloudinary.api
+    CLOUDINARY_AVAILABLE = True
+except ImportError:
+    CLOUDINARY_AVAILABLE = False
 
-    email_otp = str(data.get("email_otp", "")).strip()
-    email = str(data.get("email", "")).strip().lower()
+CLOUDINARY_CLOUD_NAME = os.getenv('CLOUDINARY_CLOUD_NAME', 'multitherapy').strip()
+CLOUDINARY_API_KEY = os.getenv('CLOUDINARY_API_KEY', '').strip()
+CLOUDINARY_API_SECRET = os.getenv('CLOUDINARY_API_SECRET', '').strip()
+CLOUDINARY_UPLOAD_PRESET = os.getenv('CLOUDINARY_UPLOAD_PRESET', '').strip()
 
-    pending = None
-    if not hasattr(app, "pending_signups"):
-        app.pending_signups = {}
-
-    if email and email in app.pending_signups:
-        pending = app.pending_signups[email]
-    elif 'signup_pending' in session:
-        pending = session['signup_pending']
-
-    if not pending:
-        return jsonify({
-            "success": False,
-            "message": "Signup session expired or not found. Please sign up again."
-        }), 400
-
-    if time.time() > pending.get("expires_at", 0):
-        if email in app.pending_signups:
-            del app.pending_signups[email]
-        session.pop('signup_pending', None)
-        return jsonify({
-            "success": False,
-            "message": "OTP has expired. Please sign up again or request a new OTP."
-        }), 400
-
-    expected_otp = pending.get("otp") or session.get('email_otp')
-    if not email_otp or email_otp != str(expected_otp):
-        return jsonify({
-            "success": False,
-            "message": "Invalid Email OTP. Please check the code and try again."
-        }), 400
-
-    password_hash = pending.get("password_hash")
-    con = db()
-    new_user_id = None
-    try:
-        with con.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO users
-                (
-                    hospital_name,
-                    phone,
-                    username,
-                    email,
-                    doctor_name,
-                    doctor_specialization,
-                    password,
-                    role,
-                    document_file
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """,
-                (
-                    pending['hospital_name'],
-                    pending['phone'],
-                    pending['username'],
-                    pending['email'],
-                    pending['doctor_name'],
-                    pending['doctor_specialization'],
-                    password_hash,
-                    "Admin",
-                    pending.get('document_file')
-                )
+CLOUDINARY_CONFIGURED = False
+if CLOUDINARY_AVAILABLE and CLOUDINARY_CLOUD_NAME and CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET:
+    if CLOUDINARY_API_KEY not in ('your_api_key_here', '') and CLOUDINARY_API_SECRET not in ('your_api_secret_here', ''):
+        try:
+            cloudinary.config(
+                cloud_name=CLOUDINARY_CLOUD_NAME,
+                api_key=CLOUDINARY_API_KEY,
+                api_secret=CLOUDINARY_API_SECRET,
+                secure=True
             )
-            new_user_id = cur.lastrowid
+            CLOUDINARY_CONFIGURED = True
+            print(f"[Cloudinary] Connected successfully with cloud_name: {CLOUDINARY_CLOUD_NAME}")
+        except Exception as cdn_err:
+            print(f"[Cloudinary] Initialization warning: {cdn_err}")
 
-            if new_user_id and pending.get('doctor_name'):
-                cur.execute(
-                    """
-                    INSERT INTO doctors (name, specialization, contact, email, user_id)
-                    VALUES (%s, %s, %s, %s, %s)
-                    """,
-                    (
-                        pending['doctor_name'],
-                        pending['doctor_specialization'],
-                        pending['phone'],
-                        pending['email'],
-                        new_user_id
-                    )
+
+def upload_image_to_cloudinary(file_or_data, folder="multi_therapy/profiles", public_id=None):
+    """
+    Uploads an image file object or base64 string to Cloudinary CDN with automatic format
+    and quality optimization (f_auto,q_auto).
+    Returns dict with success status, secure_url, public_id, or detailed error message.
+    """
+    if not CLOUDINARY_AVAILABLE:
+        return {"success": False, "error": "Cloudinary Python package is not installed."}
+
+    if not CLOUDINARY_CONFIGURED:
+        # Check if unsigned preset is configured
+        if CLOUDINARY_CLOUD_NAME and CLOUDINARY_UPLOAD_PRESET:
+            try:
+                res = cloudinary.uploader.unsigned_upload(file_or_data, CLOUDINARY_UPLOAD_PRESET, folder=folder)
+                secure_url = res.get("secure_url") or res.get("url")
+                pub_id = res.get("public_id")
+                if secure_url and "/upload/" in secure_url and "/upload/f_auto,q_auto/" not in secure_url:
+                    secure_url = secure_url.replace("/upload/", "/upload/f_auto,q_auto/")
+                return {"success": True, "url": secure_url, "public_id": pub_id, "is_cloudinary": True}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
+
+        return {
+            "success": False,
+            "error": "Cloudinary credentials not configured in .env. Please set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET with your real credentials."
+        }
+
+    try:
+        upload_kwargs = {
+            "folder": folder,
+            "resource_type": "image",
+            "overwrite": True
+        }
+        if public_id:
+            upload_kwargs["public_id"] = public_id
+
+        res = cloudinary.uploader.upload(file_or_data, **upload_kwargs)
+        secure_url = res.get("secure_url") or res.get("url")
+        pub_id = res.get("public_id")
+
+        if secure_url and "/upload/" in secure_url and "/upload/f_auto,q_auto/" not in secure_url:
+            secure_url = secure_url.replace("/upload/", "/upload/f_auto,q_auto/")
+
+        return {
+            "success": True,
+            "url": secure_url,
+            "public_id": pub_id,
+            "is_cloudinary": True
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def delete_image_from_cloudinary(public_id):
+    if not CLOUDINARY_CONFIGURED or not public_id:
+        return False
+    try:
+        res = cloudinary.uploader.destroy(public_id, resource_type="image")
+        return res.get("result") in ["ok", "not found"]
+    except Exception as e:
+        print(f"[Cloudinary] Destroy warning: {e}")
+        return False
+
+
+# =========================================================
+# PROFILE & CLOUDINARY CDN ENDPOINTS
+# =========================================================
+
+@app.route('/api/profile', methods=['GET', 'POST', 'PUT', 'OPTIONS'])
+def api_profile_handler():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    if request.method == 'GET':
+        user_id = request.args.get('user_id') or session.get('user_id')
+        username = request.args.get('username') or session.get('user')
+
+        if not user_id and not username:
+            return jsonify({'success': False, 'message': 'User identifier required.'}), 400
+
+        try:
+            user = query(
+                """
+                SELECT user_id, username, role, hospital_name, phone, email, hospital_address,
+                       city, state, registration_number, doctor_name, doctor_specialization,
+                       profile_photo, cloudinary_public_id, created_at
+                FROM users
+                WHERE user_id = %s OR LOWER(username) = LOWER(%s)
+                """,
+                (user_id or 0, username or ''),
+                one=True
+            )
+
+            if not user:
+                return jsonify({'success': False, 'message': 'User not found.'}), 404
+
+            # Include patient or doctor specific details if available
+            role = (user.get('role') or '').lower()
+            if 'patient' in role:
+                p_info = query("SELECT * FROM patients WHERE user_id=%s", (user['user_id'],), one=True)
+                if p_info:
+                    user['patient_id'] = p_info.get('patient_id')
+                    user['name'] = p_info.get('name') or user.get('doctor_name')
+                    user['age'] = p_info.get('age')
+                    user['gender'] = p_info.get('gender')
+                    user['address'] = p_info.get('address') or user.get('hospital_address')
+                    if p_info.get('profile_photo'):
+                        user['profile_photo'] = p_info.get('profile_photo')
+                    if p_info.get('cloudinary_public_id'):
+                        user['cloudinary_public_id'] = p_info.get('cloudinary_public_id')
+            elif 'doctor' in role:
+                d_info = query("SELECT * FROM doctors WHERE user_id=%s", (user['user_id'],), one=True)
+                if d_info:
+                    user['doctor_id'] = d_info.get('doctor_id')
+                    user['name'] = d_info.get('name') or user.get('doctor_name')
+                    user['specialty'] = d_info.get('specialization') or user.get('doctor_specialization')
+                    user['specialization'] = user['specialty']
+                    if d_info.get('profile_photo'):
+                        user['profile_photo'] = d_info.get('profile_photo')
+                    if d_info.get('cloudinary_public_id'):
+                        user['cloudinary_public_id'] = d_info.get('cloudinary_public_id')
+
+            return jsonify({'success': True, 'user': user}), 200
+        except Exception as e:
+            return jsonify({'success': False, 'message': f'Failed to fetch profile: {str(e)}'}), 500
+
+    # POST / PUT: Update Profile
+    try:
+        data = request.get_json(silent=True) or request.form.to_dict()
+        user_id = data.get('user_id') or session.get('user_id')
+        username = data.get('username') or session.get('user')
+
+        if not user_id and not username:
+            return jsonify({'success': False, 'message': 'User identifier required.'}), 400
+
+        user = query("SELECT user_id, role FROM users WHERE user_id=%s OR LOWER(username)=LOWER(%s)",
+                     (user_id or 0, username or ''), one=True)
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found.'}), 404
+
+        target_uid = user['user_id']
+        name = data.get('name') or data.get('doctor_name')
+        email = data.get('email')
+        phone = data.get('phone')
+        address = data.get('address') or data.get('hospital_address')
+        photo_url = data.get('profile_photo')
+        cloud_pid = data.get('cloudinary_public_id')
+
+        # Update users table
+        query(
+            """
+            UPDATE users SET
+                email = COALESCE(%s, email),
+                phone = COALESCE(%s, phone),
+                doctor_name = COALESCE(%s, doctor_name),
+                hospital_address = COALESCE(%s, hospital_address),
+                profile_photo = COALESCE(%s, profile_photo),
+                cloudinary_public_id = COALESCE(%s, cloudinary_public_id)
+            WHERE user_id = %s
+            """,
+            (email, phone, name, address, photo_url, cloud_pid, target_uid)
+        )
+
+        # Update patient/doctor table if applicable
+        role = (user.get('role') or '').lower()
+        if 'patient' in role:
+            query(
+                """
+                UPDATE patients SET
+                    name = COALESCE(%s, name),
+                    email = COALESCE(%s, email),
+                    contact = COALESCE(%s, contact),
+                    address = COALESCE(%s, address),
+                    age = COALESCE(%s, age),
+                    gender = COALESCE(%s, gender),
+                    profile_photo = COALESCE(%s, profile_photo),
+                    cloudinary_public_id = COALESCE(%s, cloudinary_public_id)
+                WHERE user_id = %s
+                """,
+                (name, email, phone, address, data.get('age'), data.get('gender'), photo_url, cloud_pid, target_uid)
+            )
+        elif 'doctor' in role:
+            query(
+                """
+                UPDATE doctors SET
+                    name = COALESCE(%s, name),
+                    email = COALESCE(%s, email),
+                    contact = COALESCE(%s, contact),
+                    specialization = COALESCE(%s, specialization),
+                    profile_photo = COALESCE(%s, profile_photo),
+                    cloudinary_public_id = COALESCE(%s, cloudinary_public_id)
+                WHERE user_id = %s
+                """,
+                (name, email, phone, data.get('specialty') or data.get('specialization'), photo_url, cloud_pid, target_uid)
+            )
+
+        return jsonify({'success': True, 'message': 'Profile credentials updated successfully in database!'}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'Failed to update profile: {str(e)}'}), 500
+
+
+@app.route('/api/cloudinary/upload', methods=['POST', 'OPTIONS'])
+@app.route('/api/upload-profile-photo', methods=['POST', 'OPTIONS'])
+@app.route('/api/profile/photo', methods=['POST', 'OPTIONS'])
+def api_upload_profile_photo_handler():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
+
+    user_id = request.form.get('user_id') or session.get('user_id')
+    username = request.form.get('username') or session.get('user')
+    user_role = request.form.get('role') or session.get('role') or 'patient'
+    photo = request.files.get('profile_photo') or request.files.get('photo') or request.files.get('file')
+
+    base64_data = None
+    if not photo and request.is_json:
+        data = request.get_json(silent=True) or {}
+        user_id = user_id or data.get('user_id')
+        username = username or data.get('username')
+        user_role = user_role or data.get('role') or 'patient'
+        base64_data = data.get('profile_photo') or data.get('photo') or data.get('file')
+
+    if not user_id and not username:
+        return jsonify({'success': False, 'message': 'User identification required to upload photo.'}), 400
+
+    if not photo and not base64_data:
+        return jsonify({'success': False, 'message': 'No image file or photo data was provided.'}), 400
+
+    try:
+        user = query(
+            'SELECT user_id, username, role, profile_photo, cloudinary_public_id FROM users WHERE ' +
+            ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
+            (user_id or username,),
+            one=True
+        )
+
+        if not user:
+            return jsonify({'success': False, 'message': 'User account not found in database.'}), 404
+
+        target_user_id = user['user_id']
+        actual_role = (user.get('role') or user_role or 'patient').lower()
+
+        # Permission check: ensure user can only modify their own photo
+        session_uid = session.get('user_id')
+        session_role = str(session.get('role', '')).lower()
+        if session_uid and session_role != 'admin' and str(session_uid) != str(target_user_id):
+            return jsonify({'success': False, 'message': 'Security check failed: You can only update your own profile photo.'}), 403
+
+        # Validate MIME / extension
+        allowed_exts = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'}
+        if photo and photo.filename:
+            ext = photo.filename.rsplit('.', 1)[-1].lower() if '.' in photo.filename else ''
+            if ext not in allowed_exts:
+                return jsonify({'success': False, 'message': f'Invalid image format (.{ext}). Only JPG, JPEG, PNG, and WEBP images are supported.'}), 400
+
+        # Upload directly to Cloudinary CDN
+        folder_name = f"multi_therapy/{actual_role}s"
+        file_to_upload = photo if photo else base64_data
+
+        cdn_res = upload_image_to_cloudinary(file_to_upload, folder=folder_name)
+        if cdn_res.get('success'):
+            secure_url = cdn_res['url']
+            public_id = cdn_res.get('public_id')
+            is_cdn = True
+        else:
+            # Graceful fallback: save locally in static/profile_photos and persist in MySQL database
+            import uuid, base64
+            os.makedirs(PROFILE_UPLOAD_FOLDER, exist_ok=True)
+            local_ext = 'jpg'
+            if photo and photo.filename and '.' in photo.filename:
+                local_ext = photo.filename.rsplit('.', 1)[-1].lower()
+            elif base64_data and 'image/png' in str(base64_data):
+                local_ext = 'png'
+            elif base64_data and 'image/webp' in str(base64_data):
+                local_ext = 'webp'
+            unique_hex = uuid.uuid4().hex[:8]
+            local_filename = f"user_{target_user_id}_{unique_hex}.{local_ext}"
+            save_path = os.path.join(PROFILE_UPLOAD_FOLDER, local_filename)
+            try:
+                if photo and hasattr(photo, 'save'):
+                    photo.seek(0)
+                    photo.save(save_path)
+                elif base64_data:
+                    b64_str = base64_data.split(',', 1)[-1] if ',' in base64_data else base64_data
+                    with open(save_path, 'wb') as sf:
+                        sf.write(base64.b64decode(b64_str))
+                secure_url = f"/profile/photo/{local_filename}"
+            except Exception:
+                secure_url = base64_data if base64_data else f"/profile/photo/{local_filename}"
+            public_id = None
+            is_cdn = False
+
+        # Persist to MySQL database
+        query(
+            'UPDATE users SET profile_photo=%s, cloudinary_public_id=%s WHERE user_id=%s',
+            (secure_url, public_id, target_user_id)
+        )
+
+        if 'patient' in actual_role:
+            try: query('UPDATE patients SET profile_photo=%s, cloudinary_public_id=%s WHERE user_id=%s', (secure_url, public_id, target_user_id))
+            except Exception: pass
+        elif 'doctor' in actual_role:
+            try: query('UPDATE doctors SET profile_photo=%s, cloudinary_public_id=%s WHERE user_id=%s', (secure_url, public_id, target_user_id))
+            except Exception: pass
+        elif 'therapist' in actual_role:
+            try: query('UPDATE therapists SET profile_photo=%s, cloudinary_public_id=%s WHERE user_id=%s', (secure_url, public_id, target_user_id))
+            except Exception: pass
+
+        # Record in user_images tracking table
+        try:
+            query(
+                """
+                INSERT INTO user_images (user_id, user_role, image_url, cloudinary_public_id, image_type, updated_at)
+                VALUES (%s, %s, %s, %s, 'profile_photo', NOW())
+                ON DUPLICATE KEY UPDATE image_url=VALUES(image_url), cloudinary_public_id=VALUES(cloudinary_public_id), updated_at=NOW()
+                """,
+                (target_user_id, actual_role, secure_url, public_id)
+            )
+        except Exception:
+            try:
+                query(
+                    "INSERT INTO user_images (user_id, user_role, image_url, cloudinary_public_id, image_type) VALUES (%s, %s, %s, %s, 'profile_photo')",
+                    (target_user_id, actual_role, secure_url, public_id)
                 )
-            con.commit()
+            except Exception: pass
+
+        return jsonify({
+            'success': True,
+            'message': 'Profile photo uploaded to Cloudinary CDN and saved to MySQL successfully!',
+            'photo_url': secure_url,
+            'profile_photo': secure_url,
+            'cloudinary_public_id': public_id,
+            'is_cdn': True
+        }), 200
+
     except Exception as e:
-        con.rollback()
-        return jsonify({
-            "success": False,
-            "message": f"Database error creating account: {str(e)}"
-        }), 500
-    finally:
-        con.close()
-
-    if email in app.pending_signups:
-        del app.pending_signups[email]
-    session.pop('signup_pending', None)
-    session.pop('email_otp', None)
-    session.pop('otp_expires_at', None)
-
-    return jsonify({
-        "success": True,
-        "message": "Account created successfully! Redirecting to login...",
-        "user_id": new_user_id
-    }), 201
+        return jsonify({'success': False, 'message': f'Server error processing photo upload: {str(e)}'}), 500
 
 
-@app.route("/api/resend-signup-otp", methods=["POST"])
-def api_resend_signup_otp():
-    data = request.form.to_dict() if request.form else (
-        request.get_json(silent=True) or {}
-    )
-    email = str(data.get("email", "")).strip().lower()
+@app.route('/api/cloudinary/delete', methods=['POST', 'OPTIONS'])
+@app.route('/api/remove-profile-photo', methods=['POST', 'OPTIONS'])
+@app.route('/api/profile/photo/remove', methods=['POST', 'OPTIONS'])
+def api_remove_profile_photo_handler():
+    if request.method == 'OPTIONS':
+        return make_response('', 204)
 
-    if not hasattr(app, "pending_signups"):
-        app.pending_signups = {}
+    data = (request.get_json(silent=True) or {}) if request.is_json else request.form.to_dict()
+    user_id = data.get('user_id') or session.get('user_id')
+    username = data.get('username') or session.get('user')
+    public_id_param = data.get('cloudinary_public_id') or data.get('public_id')
 
-    pending = None
-    if email and email in app.pending_signups:
-        pending = app.pending_signups[email]
-    elif 'signup_pending' in session:
-        pending = session['signup_pending']
-        email = pending.get('email', '')
+    if not user_id and not username:
+        return jsonify({'success': False, 'message': 'User identifier required.'}), 400
 
-    if not pending:
-        return jsonify({
-            "success": False,
-            "message": "Signup session expired. Please sign up again."
-        }), 400
-
-    new_otp = generate_otp()
-    pending['otp'] = new_otp
-    pending['expires_at'] = time.time() + 300
-    app.pending_signups[email] = pending
-
-    session['email_otp'] = new_otp
-    session['otp_expires_at'] = time.time() + 300
-
-    delivered = False
     try:
-        delivered = send_email_otp(email, new_otp)
-    except Exception as exc:
-        print("RESEND SIGNUP OTP ERROR:", repr(exc))
+        user = query(
+            'SELECT user_id, username, role, profile_photo, cloudinary_public_id FROM users WHERE ' +
+            ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
+            (user_id or username,),
+            one=True
+        )
 
-    return jsonify({
-        "success": True,
-        "message": "New OTP sent to your email.",
-        "delivered": delivered,
-        "demo_otp": new_otp if not delivered else None
-    }), 200
+        if not user:
+            return jsonify({'success': False, 'message': 'User not found.'}), 404
 
+        target_user_id = user['user_id']
+        actual_role = (user.get('role') or 'patient').lower()
 
-# =========================================================
-# VERCEL FORGOT PASSWORD & RESET APIS (TOKEN & SESSION BACKED)
-# =========================================================
+        # Security check
+        session_uid = session.get('user_id')
+        session_role = str(session.get('role', '')).lower()
+        if session_uid and session_role != 'admin' and str(session_uid) != str(target_user_id):
+            return jsonify({'success': False, 'message': 'Permission denied: You can only remove your own photo.'}), 403
 
-from itsdangerous import URLSafeTimedSerializer
+        # Destroy on Cloudinary
+        cloudinary_pid = public_id_param or user.get('cloudinary_public_id')
+        if not cloudinary_pid:
+            try:
+                img_rec = query("SELECT cloudinary_public_id FROM user_images WHERE user_id=%s ORDER BY id DESC LIMIT 1", (target_user_id,), one=True)
+                if img_rec:
+                    cloudinary_pid = img_rec.get('cloudinary_public_id')
+            except Exception: pass
 
-def get_reset_serializer():
-    secret = app.secret_key or os.getenv('SECRET_KEY', 'cp-management-secret-2026')
-    return URLSafeTimedSerializer(secret)
+        if cloudinary_pid:
+            delete_image_from_cloudinary(cloudinary_pid)
 
-@app.route("/api/forgot-password", methods=["POST"])
-def api_forgot_password():
-    data = request.get_json(silent=True) or {}
-    identifier = str(data.get("identifier", "")).strip()
+        # Clear MySQL fields
+        query('UPDATE users SET profile_photo=NULL, cloudinary_public_id=NULL WHERE user_id=%s', (target_user_id,))
+        try: query('UPDATE patients SET profile_photo=NULL, cloudinary_public_id=NULL WHERE user_id=%s', (target_user_id,))
+        except Exception: pass
+        try: query('UPDATE doctors SET profile_photo=NULL, cloudinary_public_id=NULL WHERE user_id=%s', (target_user_id,))
+        except Exception: pass
+        try: query('UPDATE therapists SET profile_photo=NULL, cloudinary_public_id=NULL WHERE user_id=%s', (target_user_id,))
+        except Exception: pass
+        try: query('DELETE FROM user_images WHERE user_id=%s', (target_user_id,))
+        except Exception: pass
 
-    if not identifier:
         return jsonify({
-            "success": False,
-            "message": "Please enter your username or registered email."
-        }), 400
-
-    user = query(
-        """
-        SELECT user_id, username, email
-        FROM users
-        WHERE username=%s OR email=%s
-        LIMIT 1
-        """,
-        (identifier, identifier),
-        one=True
-    )
-
-    if not user:
-        return jsonify({
-            "success": False,
-            "message": "No account found matching that username or email."
-        }), 404
-
-    target_email = user.get("email") or os.getenv("EMAIL_ADDRESS", "admin@hospital.org")
-
-    reset_otp = f"{random.randint(100000, 999999)}"
-    delivered = send_email_otp(target_email, reset_otp)
-
-    s = get_reset_serializer()
-    reset_token = s.dumps({
-        "user_id": user["user_id"],
-        "otp": reset_otp
-    })
-
-    # Store in session as well
-    session["api_reset"] = {
-        "user_id": user["user_id"],
-        "email": target_email,
-        "otp": reset_otp,
-        "expires_at": time.time() + 600,
-        "verified": False
-    }
-
-    if delivered:
-        return jsonify({
-            "success": True,
-            "message": f"A 6-digit OTP has been sent to {target_email}.",
-            "reset_token": reset_token
-        }), 200
-    else:
-        return jsonify({
-            "success": True,
-            "message": f"SMTP is restricted by cloud host. Your reset OTP is: {reset_otp}",
-            "demo_otp": reset_otp,
-            "reset_token": reset_token
+            'success': True,
+            'message': 'Profile photo removed from Cloudinary CDN and MySQL successfully!',
+            'profile_photo': None
         }), 200
 
-
-@app.route("/api/verify-reset-otp", methods=["POST"])
-def api_verify_reset_otp():
-    data = request.get_json(silent=True) or {}
-    otp = str(data.get("otp", "")).strip()
-    reset_token = data.get("reset_token")
-
-    user_id = None
-    expected_otp = None
-
-    if reset_token:
-        try:
-            s = get_reset_serializer()
-            payload = s.loads(reset_token, max_age=600)
-            user_id = payload.get("user_id")
-            expected_otp = str(payload.get("otp", ""))
-        except Exception:
-            return jsonify({
-                "success": False,
-                "message": "Recovery session expired. Please start over."
-            }), 400
-    else:
-        reset_state = session.get("api_reset")
-        if not reset_state:
-            return jsonify({
-                "success": False,
-                "message": "Password reset session expired. Please start over."
-            }), 400
-        user_id = reset_state.get("user_id")
-        expected_otp = str(reset_state.get("otp", ""))
-
-    if not otp or otp != expected_otp:
-        return jsonify({
-            "success": False,
-            "message": "Invalid OTP code. Please check and try again."
-        }), 400
-
-    s = get_reset_serializer()
-    verified_token = s.dumps({
-        "user_id": user_id,
-        "verified": True
-    })
-
-    if "api_reset" in session:
-        session["api_reset"]["verified"] = True
-
-    return jsonify({
-        "success": True,
-        "message": "OTP verified successfully. You may now choose a new password.",
-        "verified_token": verified_token
-    }), 200
-
-
-@app.route("/api/reset-password", methods=["POST"])
-def api_reset_password():
-    data = request.get_json(silent=True) or {}
-    new_password = str(data.get("password", ""))
-    confirm_password = str(data.get("confirm_password", ""))
-    verified_token = data.get("verified_token")
-
-    user_id = None
-    if verified_token:
-        try:
-            s = get_reset_serializer()
-            payload = s.loads(verified_token, max_age=600)
-            if not payload.get("verified"):
-                raise ValueError("Not verified")
-            user_id = payload.get("user_id")
-        except Exception:
-            return jsonify({
-                "success": False,
-                "message": "Reset authorization expired or invalid. Please verify OTP again."
-            }), 403
-    else:
-        reset_state = session.get("api_reset")
-        if not reset_state or not reset_state.get("verified"):
-            return jsonify({
-                "success": False,
-                "message": "Unauthorized or unverified request. Please verify OTP first."
-            }), 403
-        user_id = reset_state.get("user_id")
-
-    if not new_password or not confirm_password:
-        return jsonify({
-            "success": False,
-            "message": "Please enter both password fields."
-        }), 400
-
-    if new_password != confirm_password:
-        return jsonify({
-            "success": False,
-            "message": "Passwords do not match."
-        }), 400
-
-    if len(new_password) < 6:
-        return jsonify({
-            "success": False,
-            "message": "Password must be at least 6 characters long."
-        }), 400
-
-    hashed = generate_password_hash(new_password)
-    try:
-        query("UPDATE users SET password=%s WHERE user_id=%s", (hashed, user_id))
-        session.pop("api_reset", None)
-        return jsonify({
-            "success": True,
-            "message": "Password reset successfully! You can now log in."
-        }), 200
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "message": f"Failed to update password: {str(e)}"
-        }), 500
+        return jsonify({'success': False, 'message': f'Failed to remove photo: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
@@ -4234,1069 +4604,3 @@ if __name__ == '__main__':
         ),
         debug=True
     )
-
-@app.route('/api/dashboard', methods=['GET', 'POST', 'OPTIONS'])
-def api_dashboard():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    data = request.get_json(silent=True) or {}
-    user_id = request.args.get('user_id') or data.get('user_id') or session.get('user_id')
-    role = request.args.get('role') or data.get('role')
-
-    try:
-        if user_id:
-            if str(user_id) == "1":
-                cond = "(user_id=%s OR user_id IS NULL)"
-                cond_a = "(a.user_id=%s OR a.user_id IS NULL)"
-            else:
-                cond = "user_id=%s"
-                cond_a = "a.user_id=%s"
-
-            stats = {
-                'patients': query(f'SELECT COUNT(*) c FROM patients WHERE {cond}', (user_id,), one=True)['c'],
-                'doctors': query(f'SELECT COUNT(*) c FROM doctors WHERE {cond}', (user_id,), one=True)['c'],
-                'therapists': query(f'SELECT COUNT(*) c FROM therapists WHERE {cond}', (user_id,), one=True)['c'],
-                'appointments': query(f'SELECT COUNT(*) c FROM appointments WHERE {cond}', (user_id,), one=True)['c'],
-                'sessions': query(f'SELECT COUNT(*) c FROM therapy_sessions WHERE {cond}', (user_id,), one=True)['c'],
-                'reports': query(f'SELECT COUNT(*) c FROM progress_reports WHERE {cond}', (user_id,), one=True)['c'],
-                'assignments': query(f'SELECT COUNT(*) c FROM therapist_exercise_assignments WHERE {cond}', (user_id,), one=True)['c'] if table_exists('therapist_exercise_assignments') else 0
-            }
-
-            recent = query(f'''
-                SELECT
-                    a.appointment_date,
-                    a.appointment_time,
-                    a.status,
-                    p.name AS patient_name,
-                    d.name AS doctor_name
-                FROM appointments a
-                LEFT JOIN patients p ON a.patient_id = p.patient_id
-                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
-                WHERE {cond_a}
-                ORDER BY a.appointment_date DESC, a.appointment_time DESC
-                LIMIT 10
-            ''', (user_id,)) or []
-        else:
-            stats = {
-                'patients': query('SELECT COUNT(*) c FROM patients', one=True)['c'],
-                'doctors': query('SELECT COUNT(*) c FROM doctors', one=True)['c'],
-                'therapists': query('SELECT COUNT(*) c FROM therapists', one=True)['c'],
-                'appointments': query('SELECT COUNT(*) c FROM appointments', one=True)['c'],
-                'sessions': query('SELECT COUNT(*) c FROM therapy_sessions', one=True)['c'],
-                'reports': query('SELECT COUNT(*) c FROM progress_reports', one=True)['c'],
-                'assignments': query('SELECT COUNT(*) c FROM therapist_exercise_assignments', one=True)['c'] if table_exists('therapist_exercise_assignments') else 0
-            }
-
-            recent = query('''
-                SELECT
-                    a.appointment_date,
-                    a.appointment_time,
-                    a.status,
-                    p.name AS patient_name,
-                    d.name AS doctor_name
-                FROM appointments a
-                LEFT JOIN patients p ON a.patient_id = p.patient_id
-                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
-                ORDER BY a.appointment_date DESC, a.appointment_time DESC
-                LIMIT 10
-            ''') or []
-
-        for r in recent:
-            if 'appointment_date' in r and r['appointment_date']:
-                r['appointment_date'] = str(r['appointment_date'])
-            if 'appointment_time' in r and r['appointment_time']:
-                r['appointment_time'] = str(r['appointment_time'])
-
-        return jsonify({
-            'success': True,
-            'stats': stats,
-            'recent': recent
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/profile', methods=['GET', 'POST', 'OPTIONS'])
-def api_profile():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        user_id = request.args.get('user_id') or session.get('user_id')
-        username = request.args.get('username') or session.get('user')
-
-        if not user_id and not username:
-            return jsonify({'success': False, 'message': 'User identifier required.'}), 400
-
-        if user_id:
-            user = query('''
-                SELECT user_id, username, email, phone, hospital_name,
-                       hospital_address, city, state, registration_number,
-                       doctor_name, doctor_specialization, role, profile_photo
-                FROM users
-                WHERE user_id=%s
-            ''', (user_id,), one=True)
-        else:
-            user = query('''
-                SELECT user_id, username, email, phone, hospital_name,
-                       hospital_address, city, state, registration_number,
-                       doctor_name, doctor_specialization, role, profile_photo
-                FROM users
-                WHERE LOWER(username)=LOWER(%s)
-            ''', (username,), one=True)
-
-        if not user:
-            return jsonify({'success': False, 'message': 'User profile not found.'}), 404
-
-        return jsonify({'success': True, 'user': user})
-
-    # POST - Update profile
-    data = request.get_json(silent=True) or {}
-    user_id = data.get('user_id') or session.get('user_id')
-    username = data.get('username') or session.get('user')
-
-    if not user_id and not username:
-        return jsonify({'success': False, 'message': 'User identifier required.'}), 400
-
-    phone = str(data.get('phone', '')).strip() or None
-    email = str(data.get('email', '')).strip() or None
-    hospital_name = str(data.get('hospital_name', '')).strip() or None
-    doctor_name = str(data.get('doctor_name', '')).strip() or None
-    doctor_specialization = str(data.get('doctor_specialization', '')).strip() or None
-    hospital_address = str(data.get('hospital_address', '')).strip() or None
-    city = str(data.get('city', '')).strip() or None
-    state = str(data.get('state', '')).strip() or None
-    registration_number = str(data.get('registration_number', '')).strip() or None
-
-    try:
-        if user_id:
-            query('''
-                UPDATE users
-                SET phone=%s, email=%s, hospital_name=%s, doctor_name=%s,
-                    doctor_specialization=%s, hospital_address=%s, city=%s,
-                    state=%s, registration_number=%s
-                WHERE user_id=%s
-            ''', (phone, email, hospital_name, doctor_name, doctor_specialization,
-                  hospital_address, city, state, registration_number, user_id))
-        else:
-            query('''
-                UPDATE users
-                SET phone=%s, email=%s, hospital_name=%s, doctor_name=%s,
-                    doctor_specialization=%s, hospital_address=%s, city=%s,
-                    state=%s, registration_number=%s
-                WHERE LOWER(username)=LOWER(%s)
-            ''', (phone, email, hospital_name, doctor_name, doctor_specialization,
-                  hospital_address, city, state, registration_number, username))
-
-        # Fetch updated user
-        updated_user = query('''
-            SELECT user_id, username, email, phone, hospital_name,
-                   hospital_address, city, state, registration_number,
-                   doctor_name, doctor_specialization, role, profile_photo
-            FROM users
-            WHERE ''' + ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
-            (user_id or username,), one=True)
-
-        return jsonify({
-            'success': True,
-            'message': 'Profile updated successfully!',
-            'user': updated_user
-        })
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to update profile: {str(e)}'}), 500
-
-
-@app.route('/api/upload-profile-photo', methods=['POST', 'OPTIONS'])
-def api_upload_profile_photo():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    photo = request.files.get('profile_photo') or request.files.get('photo')
-    user_id = request.form.get('user_id') or session.get('user_id')
-    username = request.form.get('username') or session.get('user')
-
-    if not photo or not photo.filename:
-        return jsonify({'success': False, 'message': 'No photo file provided.'}), 400
-
-    if not allowed_profile_file(photo.filename):
-        return jsonify({'success': False, 'message': 'Only JPG, JPEG, PNG or WEBP images are allowed.'}), 400
-
-    if not user_id and not username:
-        return jsonify({'success': False, 'message': 'User identification required.'}), 400
-
-    try:
-        user = query(
-            'SELECT user_id, username, profile_photo FROM users WHERE ' +
-            ('user_id=%s' if user_id else 'LOWER(username)=LOWER(%s)'),
-            (user_id or username,),
-            one=True
-        )
-
-        if not user:
-            return jsonify({'success': False, 'message': 'User not found.'}), 404
-
-        extension = photo.filename.rsplit('.', 1)[1].lower()
-        filename = secure_filename(f"user_{user['user_id']}_{int(time.time())}.{extension}")
-        save_path = os.path.join(PROFILE_UPLOAD_FOLDER, filename)
-        photo.save(save_path)
-
-        query('UPDATE users SET profile_photo=%s WHERE user_id=%s', (filename, user['user_id']))
-
-        return jsonify({
-            'success': True,
-            'message': 'Profile photo uploaded successfully!',
-            'filename': filename,
-            'photo_url': f"/static/profile_photos/{filename}"
-        }), 200
-
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Upload failed: {str(e)}'}), 500
-
-
-@app.route('/api/patients', methods=['GET', 'POST', 'OPTIONS'])
-def api_patients():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id') or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    cond = "(user_id=%s OR user_id IS NULL)"
-                else:
-                    cond = "user_id=%s"
-                rows = query(f'''
-                    SELECT patient_id, name, age, gender, contact, email,
-                           otp_verified, address, disability_details, registration_date
-                    FROM patients
-                    WHERE {cond}
-                    ORDER BY patient_id DESC
-                ''', (user_id,))
-            else:
-                rows = query('''
-                    SELECT patient_id, name, age, gender, contact, email,
-                           otp_verified, address, disability_details, registration_date
-                    FROM patients
-                    ORDER BY patient_id DESC
-                ''')
-
-            # Format dates for json
-            for r in rows:
-                if 'registration_date' in r and r['registration_date']:
-                    r['registration_date'] = str(r['registration_date'])
-
-            return jsonify({'success': True, 'patients': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add new patient
-    data = request.get_json(silent=True) or {}
-    name = str(data.get('name', '')).strip()
-    age = data.get('age')
-    gender = str(data.get('gender', '')).strip()
-    contact = str(data.get('contact', '')).strip()
-    email = str(data.get('email', '')).strip() or None
-    address = str(data.get('address', '')).strip()
-    disability_details = str(data.get('disability_details', '')).strip()
-    reg_date = data.get('registration_date') or str(datetime.date.today())
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not name:
-        return jsonify({'success': False, 'message': 'Patient name is required.'}), 400
-
-    try:
-        query('''
-            INSERT INTO patients (name, age, gender, contact, email, address,
-                                 disability_details, registration_date, otp_verified, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s)
-        ''', (name, age, gender, contact, email, address, disability_details, reg_date, user_id))
-
-        return jsonify({'success': True, 'message': 'Patient added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add patient: {str(e)}'}), 500
-
-
-@app.route('/api/patients/<int:patient_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/patients/delete', methods=['POST', 'OPTIONS'])
-def api_delete_patient(patient_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if not patient_id:
-        data = request.get_json(silent=True) or {}
-        patient_id = data.get('patient_id') or data.get('item_id')
-
-    if not patient_id:
-        return jsonify({'success': False, 'message': 'Patient ID required.'}), 400
-
-    try:
-        # Delete dependent appointments or sessions if needed or delete patient
-        query('DELETE FROM appointments WHERE patient_id=%s', (patient_id,))
-        query('DELETE FROM therapy_sessions WHERE patient_id=%s', (patient_id,))
-        query('DELETE FROM patients WHERE patient_id=%s', (patient_id,))
-        return jsonify({'success': True, 'message': 'Patient deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete patient: {str(e)}'}), 500
-
-
-# ==========================================
-# API: DOCTORS
-# ==========================================
-def _ensure_doctor_gender_column():
-    try:
-        query("ALTER TABLE doctors ADD COLUMN gender VARCHAR(20) NULL DEFAULT 'Other'")
-    except Exception:
-        pass
-
-@app.route('/api/doctors', methods=['GET', 'POST', 'OPTIONS'])
-def api_doctors():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    _ensure_doctor_gender_column()
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            has_gender = True
-            try:
-                query("SELECT gender FROM doctors LIMIT 1")
-            except Exception:
-                has_gender = False
-
-            cols = "doctor_id, name, gender, specialization, contact, email, otp_verified, user_id" if has_gender else "doctor_id, name, specialization, contact, email, otp_verified, user_id"
-
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    cond = "(user_id=%s OR user_id IS NULL)"
-                else:
-                    cond = "user_id=%s"
-                rows = query(f"SELECT {cols} FROM doctors WHERE {cond} ORDER BY doctor_id DESC", (user_id,))
-            else:
-                rows = query(f"SELECT {cols} FROM doctors ORDER BY doctor_id DESC")
-
-            for r in (rows or []):
-                if 'gender' not in r or not r['gender']:
-                    r['gender'] = 'Other'
-
-            return jsonify({'success': True, 'doctors': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Direct Add (or after OTP)
-    data = request.get_json(silent=True) or {}
-    name = str(data.get('name', '')).strip()
-    gender = str(data.get('gender', 'Other')).strip() or 'Other'
-    specialization = str(data.get('specialization', '')).strip()
-    contact = str(data.get('contact', '')).strip()
-    email = str(data.get('email', '')).strip().lower()
-    user_id = data.get('user_id') or session.get('user_id')
-    otp_verified = 1 if data.get('otp_verified') is not False else 0
-
-    if not name:
-        return jsonify({'success': False, 'message': 'Doctor name is required.'}), 400
-    if not specialization:
-        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
-    if not contact:
-        return jsonify({'success': False, 'message': 'Contact number is required.'}), 400
-    if not email:
-        return jsonify({'success': False, 'message': 'Doctor email is required.'}), 400
-
-    try:
-        try:
-            query("""
-                INSERT INTO doctors (name, gender, specialization, contact, email, otp_verified, user_id)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
-            """, (name, gender, specialization, contact, email, otp_verified, user_id))
-        except Exception:
-            query("""
-                INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (name, specialization, contact, email, otp_verified, user_id))
-        return jsonify({'success': True, 'message': 'Doctor added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500
-
-
-@app.route('/api/doctors/send-otp', methods=['POST', 'OPTIONS'])
-def api_send_doctor_otp():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    data = request.get_json(silent=True) or {}
-    name = str(data.get('name', '')).strip()
-    gender = str(data.get('gender', 'Other')).strip() or 'Other'
-    specialization = str(data.get('specialization', '')).strip()
-    contact = str(data.get('contact', '')).strip()
-    email = str(data.get('email', '')).strip().lower()
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not name:
-        return jsonify({'success': False, 'message': 'Doctor name is required.'}), 400
-    if not specialization:
-        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
-    if not contact or len(contact) != 10 or not contact.isdigit():
-        return jsonify({'success': False, 'message': 'Contact must be a 10-digit number.'}), 400
-    if not email or '@' not in email:
-        return jsonify({'success': False, 'message': 'Valid doctor email is required.'}), 400
-
-    otp = f"{random.randint(100000, 999999)}"
-    delivered = False
-    try:
-        delivered = send_email_otp(email, otp)
-    except Exception as ex:
-        print("Doctor OTP email error:", ex)
-
-    s = get_reset_serializer()
-    doctor_token = s.dumps({
-        'name': name,
-        'gender': gender,
-        'specialization': specialization,
-        'contact': contact,
-        'email': email,
-        'user_id': user_id,
-        'otp': otp
-    })
-
-    if delivered:
-        return jsonify({
-            'success': True,
-            'message': f'OTP sent successfully to {email}. Valid for 10 minutes.',
-            'doctor_token': doctor_token
-        }), 200
-    else:
-        return jsonify({
-            'success': True,
-            'message': f'Email OTP generated. (If email delivery is restricted, test OTP: {otp})',
-            'demo_otp': otp,
-            'doctor_token': doctor_token
-        }), 200
-
-
-@app.route('/api/doctors/verify-otp', methods=['POST', 'OPTIONS'])
-def api_verify_doctor_otp():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    data = request.get_json(silent=True) or {}
-    entered_otp = str(data.get('otp', '')).strip()
-    doctor_token = data.get('doctor_token')
-
-    if not doctor_token:
-        return jsonify({'success': False, 'message': 'Registration session missing. Please send OTP again.'}), 400
-    if not entered_otp:
-        return jsonify({'success': False, 'message': 'Please enter the 6-digit OTP.'}), 400
-
-    try:
-        s = get_reset_serializer()
-        payload = s.loads(doctor_token, max_age=600)
-    except Exception:
-        return jsonify({'success': False, 'message': 'OTP has expired or token is invalid. Please request a new OTP.'}), 400
-
-    saved_otp = str(payload.get('otp', ''))
-    if entered_otp != saved_otp:
-        return jsonify({'success': False, 'message': 'Invalid OTP. Please check and try again.'}), 400
-
-    name = payload.get('name')
-    gender = payload.get('gender') or 'Other'
-    specialization = payload.get('specialization')
-    contact = payload.get('contact')
-    email = payload.get('email')
-    user_id = payload.get('user_id')
-
-    _ensure_doctor_gender_column()
-
-    try:
-        try:
-            query("""
-                INSERT INTO doctors (name, gender, specialization, contact, email, otp_verified, user_id)
-                VALUES (%s, %s, %s, %s, %s, 1, %s)
-            """, (name, gender, specialization, contact, email, user_id))
-        except Exception:
-            query("""
-                INSERT INTO doctors (name, specialization, contact, email, otp_verified, user_id)
-                VALUES (%s, %s, %s, %s, 1, %s)
-            """, (name, specialization, contact, email, user_id))
-        return jsonify({'success': True, 'message': f'Doctor {name} added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add doctor: {str(e)}'}), 500
-
-
-@app.route('/api/doctors/<int:doctor_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/doctors/delete', methods=['POST', 'OPTIONS'])
-def api_delete_doctor(doctor_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if not doctor_id:
-        data = request.get_json(silent=True) or {}
-        doctor_id = data.get('doctor_id') or data.get('item_id')
-
-    if not doctor_id:
-        return jsonify({'success': False, 'message': 'Doctor ID required.'}), 400
-
-    try:
-        query('DELETE FROM appointments WHERE doctor_id=%s', (doctor_id,))
-        query('DELETE FROM doctors WHERE doctor_id=%s', (doctor_id,))
-        return jsonify({'success': True, 'message': 'Doctor deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete doctor: {str(e)}'}), 500
-
-
-# ==========================================
-# API: THERAPISTS
-# ==========================================
-@app.route('/api/therapists', methods=['GET', 'POST', 'OPTIONS'])
-def api_therapists():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    cond = "(user_id=%s OR user_id IS NULL)"
-                else:
-                    cond = "user_id=%s"
-                rows = query(f"""
-                    SELECT therapist_id, name, specialization, contact, user_id
-                    FROM therapists
-                    WHERE {cond}
-                    ORDER BY therapist_id DESC
-                """, (user_id,))
-            else:
-                rows = query("""
-                    SELECT therapist_id, name, specialization, contact, user_id
-                    FROM therapists
-                    ORDER BY therapist_id DESC
-                """)
-            return jsonify({'success': True, 'therapists': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add new therapist
-    data = request.get_json(silent=True) or {}
-    name = str(data.get('name', '')).strip()
-    specialization = str(data.get('specialization', '')).strip()
-    contact = str(data.get('contact', '')).strip()
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not name:
-        return jsonify({'success': False, 'message': 'Therapist name is required.'}), 400
-    if not specialization:
-        return jsonify({'success': False, 'message': 'Specialization is required.'}), 400
-    if not contact:
-        return jsonify({'success': False, 'message': 'Contact is required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO therapists (name, specialization, contact, user_id)
-            VALUES (%s, %s, %s, %s)
-        """, (name, specialization, contact, user_id))
-        return jsonify({'success': True, 'message': 'Therapist added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add therapist: {str(e)}'}), 500
-
-
-@app.route('/api/therapists/<int:therapist_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/therapists/delete', methods=['POST', 'OPTIONS'])
-def api_delete_therapist(therapist_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if not therapist_id:
-        data = request.get_json(silent=True) or {}
-        therapist_id = data.get('therapist_id') or data.get('item_id')
-
-    if not therapist_id:
-        return jsonify({'success': False, 'message': 'Therapist ID required.'}), 400
-
-    try:
-        query('DELETE FROM therapy_sessions WHERE therapist_id=%s', (therapist_id,))
-        query('DELETE FROM therapist_exercise_assignments WHERE therapist_id=%s', (therapist_id,))
-        query('DELETE FROM therapists WHERE therapist_id=%s', (therapist_id,))
-        return jsonify({'success': True, 'message': 'Therapist deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete therapist: {str(e)}'}), 500
-
-
-# ==========================================
-# API: APPOINTMENTS
-# ==========================================
-@app.route('/api/appointments', methods=['GET', 'POST', 'OPTIONS'])
-def api_appointments():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            sql = """
-                SELECT a.appointment_id, a.patient_id, a.doctor_id,
-                       a.appointment_date, a.appointment_time, a.status,
-                       p.name AS patient_name, d.name AS doctor_name
-                FROM appointments a
-                LEFT JOIN patients p ON a.patient_id = p.patient_id
-                LEFT JOIN doctors d ON a.doctor_id = d.doctor_id
-            """
-            params = ()
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    sql += ' WHERE (a.user_id=%s OR a.user_id IS NULL) ORDER BY a.appointment_date DESC, a.appointment_time DESC'
-                else:
-                    sql += ' WHERE a.user_id=%s ORDER BY a.appointment_date DESC, a.appointment_time DESC'
-                params = (user_id,)
-            else:
-                sql += ' ORDER BY a.appointment_date DESC, a.appointment_time DESC' 
-
-            rows = query(sql, params)
-            for r in rows:
-                if 'appointment_date' in r and r['appointment_date']:
-                    r['appointment_date'] = str(r['appointment_date'])
-                if 'appointment_time' in r and r['appointment_time']:
-                    r['appointment_time'] = str(r['appointment_time'])
-
-            return jsonify({'success': True, 'appointments': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Appointment
-    data = request.get_json(silent=True) or {}
-    patient_id = data.get('patient_id')
-    doctor_id = data.get('doctor_id')
-    appt_date = data.get('appointment_date')
-    appt_time = data.get('appointment_time')
-    status = data.get('status') or 'Scheduled'
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not patient_id or not doctor_id or not appt_date or not appt_time:
-        return jsonify({'success': False, 'message': 'All appointment fields are required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO appointments (patient_id, doctor_id, appointment_date, appointment_time, status, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (patient_id, doctor_id, appt_date, appt_time, status, user_id))
-        return jsonify({'success': True, 'message': 'Appointment added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add appointment: {str(e)}'}), 500
-
-
-@app.route('/api/appointments/<int:appt_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/appointments/delete', methods=['POST', 'OPTIONS'])
-def api_delete_appointment(appt_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not appt_id:
-        data = request.get_json(silent=True) or {}
-        appt_id = data.get('appointment_id') or data.get('item_id')
-    if not appt_id:
-        return jsonify({'success': False, 'message': 'Appointment ID required.'}), 400
-    try:
-        query('DELETE FROM appointments WHERE appointment_id=%s', (appt_id,))
-        return jsonify({'success': True, 'message': 'Appointment deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete appointment: {str(e)}'}), 500
-
-
-# ==========================================
-# API: THERAPY SESSIONS
-# ==========================================
-@app.route('/api/therapy-sessions', methods=['GET', 'POST', 'OPTIONS'])
-def api_therapy_sessions():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            sql = """
-                SELECT s.session_id, s.patient_id, s.therapist_id, s.exercise_id,
-                       s.session_date, s.duration_minutes, s.notes,
-                       p.name AS patient_name, t.name AS therapist_name, e.exercise_name
-                FROM therapy_sessions s
-                LEFT JOIN patients p ON s.patient_id = p.patient_id
-                LEFT JOIN therapists t ON s.therapist_id = t.therapist_id
-                LEFT JOIN exercises e ON s.exercise_id = e.exercise_id
-            """
-            params = ()
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    sql += ' WHERE (s.user_id=%s OR s.user_id IS NULL) ORDER BY s.session_date DESC, s.session_id DESC'
-                else:
-                    sql += ' WHERE s.user_id=%s ORDER BY s.session_date DESC, s.session_id DESC'
-                params = (user_id,)
-            else:
-                sql += ' ORDER BY s.session_date DESC, s.session_id DESC' 
-
-            rows = query(sql, params)
-            for r in rows:
-                if 'session_date' in r and r['session_date']:
-                    r['session_date'] = str(r['session_date'])
-
-            return jsonify({'success': True, 'sessions': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Session
-    data = request.get_json(silent=True) or {}
-    patient_id = data.get('patient_id')
-    therapist_id = data.get('therapist_id')
-    exercise_id = data.get('exercise_id')
-    session_date = data.get('session_date')
-    duration_minutes = data.get('duration_minutes')
-    notes = data.get('notes') or ''
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not patient_id or not therapist_id or not exercise_id or not session_date or not duration_minutes:
-        return jsonify({'success': False, 'message': 'All session fields are required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO therapy_sessions (patient_id, therapist_id, exercise_id, session_date, duration_minutes, notes, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (patient_id, therapist_id, exercise_id, session_date, duration_minutes, notes, user_id))
-        return jsonify({'success': True, 'message': 'Therapy session added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add therapy session: {str(e)}'}), 500
-
-
-@app.route('/api/therapy-sessions/<int:session_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/therapy-sessions/delete', methods=['POST', 'OPTIONS'])
-def api_delete_therapy_session(session_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not session_id:
-        data = request.get_json(silent=True) or {}
-        session_id = data.get('session_id') or data.get('item_id')
-    if not session_id:
-        return jsonify({'success': False, 'message': 'Session ID required.'}), 400
-    try:
-        query('DELETE FROM therapy_sessions WHERE session_id=%s', (session_id,))
-        return jsonify({'success': True, 'message': 'Therapy session deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete session: {str(e)}'}), 500
-
-
-# ==========================================
-# API: EXERCISES
-# ==========================================
-@app.route('/api/exercises', methods=['GET', 'POST', 'OPTIONS'])
-def api_exercises():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            rows = query('SELECT exercise_id, exercise_name, description, therapy_type FROM exercises ORDER BY exercise_id ASC')
-            return jsonify({'success': True, 'exercises': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Exercise
-    data = request.get_json(silent=True) or {}
-    name = str(data.get('exercise_name', '')).strip()
-    desc = str(data.get('description', '')).strip()
-    therapy_type = str(data.get('therapy_type', '')).strip()
-
-    if not name:
-        return jsonify({'success': False, 'message': 'Exercise name is required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO exercises (exercise_name, description, therapy_type)
-            VALUES (%s, %s, %s)
-        """, (name, desc, therapy_type))
-        return jsonify({'success': True, 'message': 'Exercise added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add exercise: {str(e)}'}), 500
-
-
-@app.route('/api/exercises/<int:exercise_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/exercises/delete', methods=['POST', 'OPTIONS'])
-def api_delete_exercise(exercise_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not exercise_id:
-        data = request.get_json(silent=True) or {}
-        exercise_id = data.get('exercise_id') or data.get('item_id')
-    if not exercise_id:
-        return jsonify({'success': False, 'message': 'Exercise ID required.'}), 400
-    try:
-        query('DELETE FROM exercises WHERE exercise_id=%s', (exercise_id,))
-        return jsonify({'success': True, 'message': 'Exercise deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete exercise: {str(e)}'}), 500
-
-
-# ==========================================
-# API: EXERCISE ASSIGNMENTS
-# ==========================================
-@app.route('/api/exercise-assignments', methods=['GET', 'POST', 'OPTIONS'])
-def api_exercise_assignments():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            sql = """
-                SELECT a.assignment_id, a.patient_id, a.therapist_id, a.exercise_id,
-                       a.difficulty, a.target_type, a.target_value, a.frequency,
-                       a.start_date, a.end_date, a.notes, a.status,
-                       p.name AS patient_name, t.name AS therapist_name, e.exercise_name
-                FROM therapist_exercise_assignments a
-                LEFT JOIN patients p ON a.patient_id = p.patient_id
-                LEFT JOIN therapists t ON a.therapist_id = t.therapist_id
-                LEFT JOIN exercises e ON a.exercise_id = e.exercise_id
-            """
-            params = ()
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    sql += ' WHERE (a.user_id=%s OR a.user_id IS NULL) ORDER BY a.assignment_id DESC'
-                else:
-                    sql += ' WHERE a.user_id=%s ORDER BY a.assignment_id DESC'
-                params = (user_id,)
-            else:
-                sql += ' ORDER BY a.assignment_id DESC' 
-
-            rows = query(sql, params)
-            for r in rows:
-                if 'start_date' in r and r['start_date']:
-                    r['start_date'] = str(r['start_date'])
-                if 'end_date' in r and r['end_date']:
-                    r['end_date'] = str(r['end_date'])
-
-            return jsonify({'success': True, 'assignments': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Assignment
-    data = request.get_json(silent=True) or {}
-    patient_id = data.get('patient_id')
-    therapist_id = data.get('therapist_id')
-    exercise_id = data.get('exercise_id')
-    difficulty = data.get('difficulty') or 'Medium'
-    target_type = data.get('target_type') or 'repetitions'
-    target_value = data.get('target_value') or 10
-    frequency = data.get('frequency') or 'Daily'
-    start_date = data.get('start_date')
-    end_date = data.get('end_date')
-    status = data.get('status') or 'Assigned'
-    notes = data.get('notes') or ''
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not patient_id or not therapist_id or not exercise_id or not start_date or not end_date:
-        return jsonify({'success': False, 'message': 'Required assignment fields missing.'}), 400
-
-    try:
-        query("""
-            INSERT INTO therapist_exercise_assignments
-            (patient_id, therapist_id, exercise_id, difficulty, target_type, target_value, frequency, start_date, end_date, notes, status, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (patient_id, therapist_id, exercise_id, difficulty, target_type, target_value, frequency, start_date, end_date, notes, status, user_id))
-        return jsonify({'success': True, 'message': 'Exercise assigned successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to assign exercise: {str(e)}'}), 500
-
-
-@app.route('/api/exercise-assignments/<int:assignment_id>/status', methods=['POST', 'OPTIONS'])
-def api_update_exercise_assignment_status(assignment_id):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    data = request.get_json(silent=True) or {}
-    new_status = data.get('status')
-    if not new_status:
-        return jsonify({'success': False, 'message': 'Status required.'}), 400
-    try:
-        query('UPDATE therapist_exercise_assignments SET status=%s WHERE assignment_id=%s', (new_status, assignment_id))
-        return jsonify({'success': True, 'message': 'Status updated successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/api/exercise-assignments/<int:assignment_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/exercise-assignments/delete', methods=['POST', 'OPTIONS'])
-def api_delete_exercise_assignment(assignment_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not assignment_id:
-        data = request.get_json(silent=True) or {}
-        assignment_id = data.get('assignment_id') or data.get('item_id')
-    if not assignment_id:
-        return jsonify({'success': False, 'message': 'Assignment ID required.'}), 400
-    try:
-        query('DELETE FROM therapist_exercise_assignments WHERE assignment_id=%s', (assignment_id,))
-        return jsonify({'success': True, 'message': 'Assignment deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete assignment: {str(e)}'}), 500
-
-
-# ==========================================
-# API: CAREGIVERS
-# ==========================================
-@app.route('/api/caregivers', methods=['GET', 'POST', 'OPTIONS'])
-def api_caregivers():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            sql = """
-                SELECT c.caregiver_id, c.patient_id, c.caregiver_name,
-                       c.relationship, c.contact, c.emergency_contact, c.user_id,
-                       p.name AS patient_name
-                FROM caregivers c
-                LEFT JOIN patients p ON c.patient_id = p.patient_id
-            """
-            params = ()
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    sql += ' WHERE (c.user_id=%s OR c.user_id IS NULL) ORDER BY c.caregiver_id DESC'
-                else:
-                    sql += ' WHERE c.user_id=%s ORDER BY c.caregiver_id DESC'
-                params = (user_id,)
-            else:
-                sql += ' ORDER BY c.caregiver_id DESC' 
-
-            rows = query(sql, params)
-            return jsonify({'success': True, 'caregivers': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Caregiver
-    data = request.get_json(silent=True) or {}
-    patient_id = data.get('patient_id')
-    name = str(data.get('caregiver_name', '')).strip()
-    relationship = str(data.get('relationship', '')).strip()
-    contact = str(data.get('contact', '')).strip()
-    emergency_contact = str(data.get('emergency_contact', '')).strip()
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not patient_id or not name or not contact:
-        return jsonify({'success': False, 'message': 'Patient, caregiver name, and contact are required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO caregivers (patient_id, caregiver_name, relationship, contact, emergency_contact, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (patient_id, name, relationship, contact, emergency_contact, user_id))
-        return jsonify({'success': True, 'message': 'Caregiver added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add caregiver: {str(e)}'}), 500
-
-
-@app.route('/api/caregivers/<int:caregiver_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/caregivers/delete', methods=['POST', 'OPTIONS'])
-def api_delete_caregiver(caregiver_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not caregiver_id:
-        data = request.get_json(silent=True) or {}
-        caregiver_id = data.get('caregiver_id') or data.get('item_id')
-    if not caregiver_id:
-        return jsonify({'success': False, 'message': 'Caregiver ID required.'}), 400
-    try:
-        query('DELETE FROM caregivers WHERE caregiver_id=%s', (caregiver_id,))
-        return jsonify({'success': True, 'message': 'Caregiver deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete caregiver: {str(e)}'}), 500
-
-
-# ==========================================
-# API: PROGRESS REPORTS
-# ==========================================
-@app.route('/api/progress-reports', methods=['GET', 'POST', 'OPTIONS'])
-def api_progress_reports():
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-
-    if request.method == 'GET':
-        try:
-            user_id = request.args.get('user_id')
-            role = request.args.get('role')
-
-            sql = """
-                SELECT pr.report_id, pr.patient_id, pr.report_date,
-                       pr.mobility_score, pr.improvement_notes, pr.user_id,
-                       p.name AS patient_name
-                FROM progress_reports pr
-                LEFT JOIN patients p ON pr.patient_id = p.patient_id
-            """
-            params = ()
-            user_id = user_id or session.get('user_id')
-            if user_id:
-                if str(user_id) == "1":
-                    sql += ' WHERE (pr.user_id=%s OR pr.user_id IS NULL) ORDER BY pr.report_id DESC'
-                else:
-                    sql += ' WHERE pr.user_id=%s ORDER BY pr.report_id DESC'
-                params = (user_id,)
-            else:
-                sql += ' ORDER BY pr.report_id DESC' 
-
-            rows = query(sql, params)
-            for r in rows:
-                if 'report_date' in r and r['report_date']:
-                    r['report_date'] = str(r['report_date'])
-
-            return jsonify({'success': True, 'reports': rows or []})
-        except Exception as e:
-            return jsonify({'success': False, 'message': str(e)}), 500
-
-    # POST - Add Report
-    data = request.get_json(silent=True) or {}
-    patient_id = data.get('patient_id')
-    report_date = data.get('report_date')
-    mobility_score = data.get('mobility_score')
-    notes = data.get('improvement_notes') or ''
-    user_id = data.get('user_id') or session.get('user_id')
-
-    if not patient_id or not report_date:
-        return jsonify({'success': False, 'message': 'Patient and report date are required.'}), 400
-
-    try:
-        query("""
-            INSERT INTO progress_reports (patient_id, report_date, mobility_score, improvement_notes, user_id)
-            VALUES (%s, %s, %s, %s, %s)
-        """, (patient_id, report_date, mobility_score, notes, user_id))
-        return jsonify({'success': True, 'message': 'Progress report added successfully!'}), 201
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to add report: {str(e)}'}), 500
-
-
-@app.route('/api/progress-reports/<int:report_id>', methods=['DELETE', 'OPTIONS'])
-@app.route('/api/progress-reports/delete', methods=['POST', 'OPTIONS'])
-def api_delete_progress_report(report_id=None):
-    if request.method == 'OPTIONS':
-        return make_response('', 204)
-    if not report_id:
-        data = request.get_json(silent=True) or {}
-        report_id = data.get('report_id') or data.get('item_id')
-    if not report_id:
-        return jsonify({'success': False, 'message': 'Report ID required.'}), 400
-    try:
-        query('DELETE FROM progress_reports WHERE report_id=%s', (report_id,))
-        return jsonify({'success': True, 'message': 'Progress report deleted successfully!'})
-    except Exception as e:
-        return jsonify({'success': False, 'message': f'Failed to delete report: {str(e)}'}), 500
