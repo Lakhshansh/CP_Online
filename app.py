@@ -768,19 +768,20 @@ def send_email_otp(email, otp):
     raw_pwd = os.getenv('EMAIL_PASSWORD', EMAIL_PASSWORD)
     pwd = raw_pwd.replace(' ', '').replace('"', '').replace("'", "").strip() if raw_pwd else ''
 
-    # 1. Try Resend HTTP API if configured (Port 443 HTTPS - never blocked by cloud hosts)
+    # 1. Try Resend HTTP API if configured (Port 443 HTTPS - server-side verified sender)
     resend_api_key = os.getenv('RESEND_API_KEY')
     if resend_api_key:
         try:
             import urllib.request
             import json
+            sender = os.getenv('EMAIL_FROM') or os.getenv('RESEND_FROM_EMAIL') or 'Multi Therapy <onboarding@resend.dev>'
             req = urllib.request.Request(
                 'https://api.resend.com/emails',
                 data=json.dumps({
-                    'from': os.getenv('EMAIL_FROM', 'onboarding@resend.dev'),
+                    'from': sender,
                     'to': [email],
-                    'subject': 'Multi Therapy Management System - Email OTP',
-                    'html': f'<p>Your OTP is <strong>{otp}</strong>. It is valid for 5 minutes.</p>'
+                    'subject': 'Every Individual Deserves Better Care - Email Verification OTP',
+                    'html': f'<p>Your Multi Therapy verification OTP is <strong>{otp}</strong>. It is valid for 10 minutes.</p>'
                 }).encode('utf-8'),
                 headers={
                     'Authorization': f'Bearer {resend_api_key}',
@@ -788,12 +789,22 @@ def send_email_otp(email, otp):
                     'User-Agent': 'MultiTherapy-Mailer/1.0'
                 }
             )
-            with urllib.request.urlopen(req, timeout=8) as resp:
+            with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status in (200, 201):
-                    print(f"Resend HTTP API successfully delivered OTP to {email}")
-                    return True
+                    resp_body = resp.read().decode('utf-8')
+                    try:
+                        parsed = json.loads(resp_body)
+                        if parsed.get('id'):
+                            print(f"Resend HTTP API successfully delivered OTP to {email} (ID: {parsed.get('id')})")
+                            return True
+                    except Exception:
+                        return True
         except Exception as e:
-            print("Resend HTTP API notice:", e)
+            detail = f"{e} - {e.read().decode('utf-8')}" if hasattr(e, 'read') else str(e)
+            if "You can only send testing emails to your own email address" in detail or "domain is not verified" in detail:
+                print(f"[Resend Domain Notice] Sender domain is not verified. Patient emails to {email} require a verified domain at https://resend.com/domains configured via EMAIL_FROM.")
+            else:
+                print("Resend HTTP API notice:", detail)
 
     # 2. Try SMTP Port 587 then Port 465 with 5-second timeout
     if addr and pwd:
